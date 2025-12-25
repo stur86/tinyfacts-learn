@@ -1,0 +1,3 @@
+[submodule "tinyfacts-gen"]
+	path = tinyfacts-gen
+	url = https://github.com/stur86/tinyfacts-gen

@@ -1,0 +1,1 @@
+A lock is a thing that stays closed to keep things safe.

@@ -99,13 +99,12 @@ def inspect(
 @app.command()
 def generate(
     model_name: Annotated[str, typer.Argument(help="Model folder name under models/")],
-    prompt: Annotated[str, typer.Argument(help="Text prompt to continue from")],
     checkpoint: Annotated[Optional[Path], typer.Option(help="Checkpoint .pt file (default: latest)")] = None,
     tokens: Annotated[int, typer.Option(help="Number of tokens to generate")] = 100,
     temperature: Annotated[float, typer.Option(help="Sampling temperature (0 = greedy)")] = 1.0,
     top_k: Annotated[int, typer.Option(help="Top-k sampling (0 = disabled)")] = 0,
 ):
-    """Generate text from a prompt using a trained model checkpoint."""
+    """Interactively generate text — loads a checkpoint then prompts for input."""
     from generate import generate_tokens
 
     # Resolve checkpoint — default to latest
@@ -135,15 +134,27 @@ def generate(
     device = "cuda" if torch.cuda.is_available() else "cpu"
     model = model.to(device)
 
-    typer.echo(f"\nPrompt: {prompt}")
-    typer.echo("─" * 40)
+    typer.echo(f"\nModel ready. Generating {tokens} tokens per prompt.")
+    typer.echo("Enter a prompt and press Enter. Ctrl+C to quit.\n")
 
-    generated, _ = generate_tokens(
-        model, tokenizer, prompt,
-        n_tokens=tokens, temperature=temperature, top_k=top_k, device=device,
-    )
+    while True:
+        try:
+            prompt = input("Prompt> ").strip()
+        except (KeyboardInterrupt, EOFError):
+            typer.echo("\nGoodbye!")
+            break
 
-    typer.echo(f"{prompt} {generated}\n")
+        if not prompt:
+            continue
+
+        try:
+            generated, _ = generate_tokens(
+                model, tokenizer, prompt,
+                n_tokens=tokens, temperature=temperature, top_k=top_k, device=device,
+            )
+            typer.echo(f"\n{prompt} {generated}\n")
+        except ValueError as e:
+            typer.echo(f"Error: {e}", err=True)
 
 
 if __name__ == "__main__":

@@ -80,3 +80,15 @@ def test_causal_masking():
     # Position 0 logits must be identical (it only attends to itself)
     assert torch.allclose(logits_orig[0, 0], logits_perturbed[0, 0]), \
         "Causal mask violated: position 0 logits changed when future tokens were perturbed"
+
+
+def test_train_dry_run():
+    """Training script must complete a dry run without error."""
+    import subprocess, sys
+    result = subprocess.run(
+        [sys.executable, "train.py", "gpt_small", "--dry-run"],
+        capture_output=True,
+        text=True,
+        cwd=str(_REPO_ROOT),
+    )
+    assert result.returncode == 0, f"Dry run failed:\nSTDOUT:\n{result.stdout}\nSTDERR:\n{result.stderr}"

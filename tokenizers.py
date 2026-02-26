@@ -123,17 +123,14 @@ class WordTokenizer:
             if match:
                 raw_word = match.group(0)
                 text = text[match.end():]
-                print(raw_word, " | ", text)
                 if re.match(r"[A-Z]", raw_word[0]):
                     if not self._ignore_case:
-                        token_ids.append(self._tokens.index("<UPC>"))
+                        token_ids.append(self._token_to_id["<UPC>"])
                     raw_word = raw_word.lower()
                 if raw_word in self._word_forms_dict._word_map:
-                    print("Known word:", raw_word)
                     tokens = self._word_forms_dict.get_tokens(raw_word)
-                    print("Tokens:", tokens)
                     for token in tokens:
-                        token_ids.append(self._tokens.index(token))
+                        token_ids.append(self._token_to_id[token])
                 else:
                     token_ids.append(self._token_to_id["<UNK>"])
             elif space_match:

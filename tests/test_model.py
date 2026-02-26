@@ -4,8 +4,9 @@ import torch
 import importlib.util
 from pathlib import Path
 
-CONFIG_PATH = Path("models/gpt_small/config.json")
-MODEL_PATH = Path("models/gpt_small/model.py")
+_REPO_ROOT = Path(__file__).parent.parent
+CONFIG_PATH = _REPO_ROOT / "models/gpt_small/config.json"
+MODEL_PATH = _REPO_ROOT / "models/gpt_small/model.py"
 VOCAB_SIZE = 1024  # approximate; exact value doesn't matter for shape tests
 BATCH = 2
 
@@ -56,3 +57,26 @@ def test_model_param_count_under_2m():
     model = mod.build_model(config, vocab_size=VOCAB_SIZE)
     n_params = sum(p.numel() for p in model.parameters())
     assert n_params < 2_000_000, f"Model too large: {n_params:,} params"
+
+
+def test_causal_masking():
+    """Future tokens must not influence past token logits."""
+    mod = _load_model_module()
+    config = json.loads(CONFIG_PATH.read_text())
+    context_size = config["context_size"]
+    model = mod.build_model(config, vocab_size=VOCAB_SIZE)
+    model.eval()
+
+    x = torch.randint(0, VOCAB_SIZE, (1, context_size))
+    with torch.no_grad():
+        logits_orig = model(x)
+
+    # Perturb all tokens from position 1 onwards
+    x_perturbed = x.clone()
+    x_perturbed[0, 1:] = torch.randint(0, VOCAB_SIZE, (context_size - 1,))
+    with torch.no_grad():
+        logits_perturbed = model(x_perturbed)
+
+    # Position 0 logits must be identical (it only attends to itself)
+    assert torch.allclose(logits_orig[0, 0], logits_perturbed[0, 0]), \
+        "Causal mask violated: position 0 logits changed when future tokens were perturbed"

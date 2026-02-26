@@ -74,6 +74,12 @@ uv run python main.py inspect gpt_small --checkpoint models/gpt_small/checkpoint
 ```
 Shows config, total/trainable parameters, per-component breakdown (tied-weight aware), and a summary of all training runs.
 
+### report
+```bash
+uv run python main.py report models/gpt_small/runs/run_<timestamp>.jsonl
+```
+Reads a training run JSONL file and writes a report folder alongside it (named after the run stem) containing: `loss.png`, `perplexity.png`, `accuracy.png`, `lr.png`, and `overview.png` (2×2 grid). Each plot has a secondary epoch axis. Core logic is in `report.py` → `generate_report(jsonl_path)`.
+
 ### generate
 ```bash
 uv run python main.py generate gpt_small
@@ -89,6 +95,7 @@ Loads the latest checkpoint (or `--checkpoint` path), then enters an interactive
 | `dataset.py` | `TinyfactsDataset` — validates, tokenizes, sliding-window Dataset |
 | `train.py` | Core training logic (importable); JSONL stats; cosine LR scheduler |
 | `generate.py` | `generate_tokens(model, tokenizer, prompt, n_tokens, temperature, top_k)` |
+| `report.py` | `generate_report(jsonl_path)` → plots folder |
 | `main.py` | Typer CLI hub: `train`, `inspect`, `generate` |
 | `models/gpt_small/model.py` | GPT-small transformer + `build_model` factory |
 | `models/gpt_small/config.json` | Hyperparameters + training settings |
@@ -102,6 +109,7 @@ Run with `uv run pytest tests/ -v` (23 tests).
 | `tests/test_dataset.py` | 9 tests — loading, shapes, dtypes, shift, OOV rejection |
 | `tests/test_model.py` | 9 tests — config, forward shape, param count, causal masking, dry-run, JSONL stats |
 | `tests/test_generate.py` | 5 tests — output type, token count, greedy determinism, empty-prompt error, top-k |
+| `tests/test_report.py` | 5 tests — output dir, individual PNGs, overview, naming, empty-file error |
 
 ## Adding a new model
 

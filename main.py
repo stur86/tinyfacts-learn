@@ -94,6 +94,27 @@ def inspect(
     typer.echo("")
 
 
+# ── report ─────────────────────────────────────────────────────────────────────
+
+@app.command()
+def report(
+    jsonl_file: Annotated[Path, typer.Argument(help="Path to a run_*.jsonl stats file")],
+):
+    """Generate a report folder with plots from a training run JSONL file."""
+    from report import generate_report
+
+    if not jsonl_file.exists():
+        typer.echo(f"File not found: {jsonl_file}", err=True)
+        raise typer.Exit(1)
+
+    typer.echo(f"Reading {jsonl_file} ...")
+    out_dir = generate_report(jsonl_file)
+    plots = sorted(out_dir.glob("*.png"))
+    typer.echo(f"Report written to {out_dir}/")
+    for p in plots:
+        typer.echo(f"  {p.name}")
+
+
 # ── generate ───────────────────────────────────────────────────────────────────
 
 @app.command()

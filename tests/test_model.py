@@ -83,12 +83,41 @@ def test_causal_masking():
 
 
 def test_train_dry_run():
-    """Training script must complete a dry run without error."""
+    """Training via main.py hub must complete a dry run without error."""
     import subprocess, sys
     result = subprocess.run(
-        [sys.executable, "train.py", "gpt_small", "--dry-run"],
+        [sys.executable, "main.py", "train", "gpt_small", "--dry-run"],
         capture_output=True,
         text=True,
         cwd=str(_REPO_ROOT),
     )
     assert result.returncode == 0, f"Dry run failed:\nSTDOUT:\n{result.stdout}\nSTDERR:\n{result.stderr}"
+
+
+def test_train_dry_run_writes_stats():
+    """Dry run must write at least one line to the JSONL stats file."""
+    import subprocess, sys, json
+    runs_dir = _REPO_ROOT / "models" / "gpt_small" / "runs"
+    # Count existing files before
+    before = set(runs_dir.glob("run_*.jsonl")) if runs_dir.exists() else set()
+
+    result = subprocess.run(
+        [sys.executable, "main.py", "train", "gpt_small", "--dry-run"],
+        capture_output=True,
+        text=True,
+        cwd=str(_REPO_ROOT),
+    )
+    assert result.returncode == 0, f"Dry run failed:\n{result.stderr}"
+
+    after = set(runs_dir.glob("run_*.jsonl"))
+    new_files = after - before
+    assert new_files, "No new JSONL stats file was created"
+
+    stats_file = next(iter(new_files))
+    lines = [l for l in stats_file.read_text().splitlines() if l.strip()]
+    assert lines, "Stats file is empty"
+    entry = json.loads(lines[0])
+    assert "loss" in entry
+    assert "perplexity" in entry
+    assert "accuracy" in entry
+    assert "step" in entry

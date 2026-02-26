@@ -3784,6 +3784,7 @@ dependencies = [
     { name = "scipy" },
     { name = "tinyfacts-gen" },
     { name = "torch" },
+    { name = "typer" },
 ]
 
 [package.dev-dependencies]
@@ -3800,6 +3801,7 @@ requires-dist = [
     { name = "scipy", specifier = ">=1.16.3" },
     { name = "tinyfacts-gen", editable = "tinyfacts-gen" },
     { name = "torch", specifier = ">=2.10.0" },
+    { name = "typer", specifier = ">=0.21.1" },
 ]
 
 [package.metadata.requires-dev]

@@ -1,14 +1,10 @@
 # train.py
-"""Training script for tinyfacts-learn models.
-
-Usage:
-    uv run python train.py gpt_small
-    uv run python train.py gpt_small --dry-run
-"""
-import argparse
+"""Core training logic for tinyfacts-learn models."""
 import importlib.util
 import json
+import math
 import sys
+import time
 from datetime import datetime
 from pathlib import Path
 
@@ -30,6 +26,8 @@ def load_model_module(model_name: str):
     if not model_file.exists():
         raise ValueError(f"model.py not found in {model_dir}")
     spec = importlib.util.spec_from_file_location(f"{model_name}_model", model_file)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"Failed to load model module from {model_file}")
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
@@ -63,23 +61,17 @@ def train(model_name: str, dry_run: bool = False):
         skip_invalid=True,
     )
     vocab_size = dataset.vocab_size
+    batch_size = config.get("batch_size", 64)
     print(f"Vocab size: {vocab_size} | Dataset size: {len(dataset)} windows")
 
-    dataloader = DataLoader(
-        dataset,
-        batch_size=config.get("batch_size", 64),
-        shuffle=True,
-        drop_last=True,
-    )
+    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True, drop_last=True)
+    steps_per_epoch = len(dataloader)
 
     model = module.build_model(config, vocab_size=vocab_size).to(device)
     n_params = sum(p.numel() for p in model.parameters())
     print(f"Model parameters: {n_params:,}")
 
-    optimizer = torch.optim.AdamW(
-        model.parameters(),
-        lr=config.get("learning_rate", 3e-4),
-    )
+    optimizer = torch.optim.AdamW(model.parameters(), lr=config.get("learning_rate", 3e-4))
 
     max_steps = 2 if dry_run else config.get("max_steps", 10000)
     eval_interval = config.get("eval_interval", 500)
@@ -88,11 +80,49 @@ def train(model_name: str, dry_run: bool = False):
     checkpoint_dir = MODELS_DIR / model_name / "checkpoints"
     checkpoint_dir.mkdir(parents=True, exist_ok=True)
 
+    run_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    runs_dir = MODELS_DIR / model_name / "runs"
+    runs_dir.mkdir(parents=True, exist_ok=True)
+    stats_file = runs_dir / f"run_{run_timestamp}.jsonl"
+
+    print(f"Stats log: {stats_file}")
+    print(f"Training for {max_steps} steps{'  [DRY RUN]' if dry_run else ''}...")
+
     model.train()
     step = 0
     data_iter = iter(dataloader)
+    train_start = time.time()
 
-    print(f"Training for {max_steps} steps{'  [DRY RUN]' if dry_run else ''}...")
+    # Running accumulators — reset after each flush
+    acc_loss = 0.0
+    acc_correct = 0
+    acc_tokens = 0
+    acc_steps = 0
+
+    def flush_stats():
+        avg_loss = acc_loss / acc_steps
+        accuracy = acc_correct / acc_tokens
+        perplexity = math.exp(min(avg_loss, 20))  # cap to avoid overflow
+        epoch = step / steps_per_epoch
+        tokens_seen = step * batch_size * config["context_size"]
+        elapsed = time.time() - train_start
+        entry = {
+            "step": step,
+            "epoch": round(epoch, 3),
+            "loss": round(avg_loss, 6),
+            "perplexity": round(perplexity, 4),
+            "accuracy": round(accuracy, 6),
+            "tokens_seen": tokens_seen,
+            "elapsed_s": round(elapsed, 2),
+            "timestamp": datetime.now().isoformat(),
+        }
+        with open(stats_file, "a") as f:
+            f.write(json.dumps(entry) + "\n")
+        print(
+            f"step {step:>6}/{max_steps} | epoch {epoch:.2f} | "
+            f"loss {avg_loss:.4f} | ppl {perplexity:.2f} | acc {accuracy:.3f}"
+        )
+        return entry
 
     while step < max_steps:
         try:
@@ -109,13 +139,25 @@ def train(model_name: str, dry_run: bool = False):
         torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
         optimizer.step()
 
+        # Accumulate stats (detached — no grad overhead)
+        with torch.no_grad():
+            preds = logits.detach().argmax(dim=-1)
+            acc_correct += (preds == y).sum().item()
+            acc_tokens += y.numel()
+        acc_loss += loss.item()
+        acc_steps += 1
         step += 1
 
-        if step % eval_interval == 0 or step == max_steps:
-            print(f"step {step}/{max_steps} | loss {loss.item():.4f}")
+        if step % eval_interval == 0:
+            flush_stats()
+            acc_loss = acc_correct = acc_tokens = acc_steps = 0
 
         if not dry_run and step % checkpoint_interval == 0:
             _save_checkpoint(model, optimizer, config, step, checkpoint_dir, model_name)
+
+    # Always flush remaining accumulated stats at the end
+    if acc_steps > 0:
+        flush_stats()
 
     if not dry_run:
         _save_checkpoint(model, optimizer, config, step, checkpoint_dir, model_name)
@@ -137,19 +179,3 @@ def _save_checkpoint(model, optimizer, config, step, checkpoint_dir, model_name)
         filename,
     )
     print(f"Checkpoint saved: {filename}")
-
-
-def main():
-    parser = argparse.ArgumentParser(description="Train a tinyfacts-learn model")
-    parser.add_argument("model_name", help="Name of the model folder under models/")
-    parser.add_argument(
-        "--dry-run",
-        action="store_true",
-        help="Run 2 training steps and exit (for testing)",
-    )
-    args = parser.parse_args()
-    train(args.model_name, dry_run=args.dry_run)
-
-
-if __name__ == "__main__":
-    main()

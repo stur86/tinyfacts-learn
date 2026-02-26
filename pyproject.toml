@@ -12,6 +12,7 @@ dependencies = [
     "scipy>=1.16.3",
     "tinyfacts-gen",
     "torch>=2.10.0",
+    "typer>=0.21.1",
 ]
 
 [tool.uv.workspace]

@@ -71,7 +71,7 @@ class TinyfactsDataset(Dataset):
 
     @property
     def vocab_size(self) -> int:
-        return len(self._tokenizer._tokens)
+        return self._tokenizer.vocab_size
 
     def __len__(self) -> int:
         return len(self._tokens) - self._context_size

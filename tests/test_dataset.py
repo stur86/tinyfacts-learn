@@ -59,3 +59,13 @@ def test_dataset_len_matches_windows():
     # Each window is context_size tokens; total windows = total_tokens - context_size
     expected = len(ds._tokens) - CONTEXT_SIZE
     assert len(ds) == expected
+
+
+def test_dataset_raises_on_invalid_file_by_default():
+    # claude_sonnet_4_5_created contains files with OOV words
+    with pytest.raises(ValueError, match="invalid word"):
+        TinyfactsDataset(
+            subfolders=["claude_sonnet_4_5_created"],
+            context_size=CONTEXT_SIZE,
+            # skip_invalid defaults to False
+        )

@@ -64,6 +64,13 @@ class LetterTokenizer:
 
 
 class WordTokenizer:
+    
+    _digits: list[str]
+    _allowed_special: str
+    _ignore_case: bool
+    _word_forms_dict: WordFormsDictionary
+    _words: list[str]
+    _special: list[str]
 
     def __init__(
         self,
@@ -71,7 +78,6 @@ class WordTokenizer:
         allowed_special: str = ".,:;!?'-\"",
         ignore_case: bool = True,
     ):
-        self._digits = digits
         self._allowed_special = allowed_special
         self._ignore_case = ignore_case
         self._word_forms_dict = WordFormsDictionary()
@@ -85,7 +91,7 @@ class WordTokenizer:
                 tags.add(f"<{tagged_word.tag}>")
 
         self._words = list(sorted(list(words)))
-        self._digits = [] if not digits else [str(i) for i in range(10)]
+        self._digits = list([] if not digits else [str(i) for i in range(10)])
         self._special = list(self._allowed_special)
         self._tags = list(sorted(list(tags)))
         self._extras = ["<UNK>"]
@@ -100,6 +106,10 @@ class WordTokenizer:
         self._base_tag_to_id = {}
         for word, tagged_word in self._word_forms_dict._word_map.items():
             self._base_tag_to_id[(tagged_word.base, tagged_word.tag)] = word
+
+    @property
+    def vocab_size(self) -> int:
+        return len(self._tokens)
 
     def tokenize(self, text: str) -> list[int]:
         # Split the text into words based on whitespace

@@ -49,6 +49,7 @@ def test_dataset_multiple_subfolders():
     ds = TinyfactsDataset(
         subfolders=["manually_created", "claude_sonnet_4_5_created"],
         context_size=CONTEXT_SIZE,
+        skip_invalid=True,
     )
     assert len(ds) > 0
 

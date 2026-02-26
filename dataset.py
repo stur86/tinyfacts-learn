@@ -28,7 +28,7 @@ class TinyfactsDataset(Dataset):
         subfolders: list[str],
         context_size: int = 128,
         tokenizer: WordTokenizer | None = None,
-        skip_invalid: bool = True,
+        skip_invalid: bool = False,
     ):
         self._context_size = context_size
         self._tokenizer = tokenizer or WordTokenizer(ignore_case=True, digits=True)

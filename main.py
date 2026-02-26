@@ -80,7 +80,7 @@ def inspect(
     if jsonl_files:
         typer.echo(f"\nTraining runs ({len(jsonl_files)} found):")
         for run_file in jsonl_files:
-            lines = [json.loads(l) for l in run_file.read_text().splitlines() if l.strip()]
+            lines = [json.loads(ln) for ln in run_file.read_text().splitlines() if ln.strip()]
             if not lines:
                 continue
             last = lines[-1]

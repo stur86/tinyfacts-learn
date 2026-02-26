@@ -10,6 +10,7 @@ from pathlib import Path
 
 import torch
 import torch.nn.functional as F
+from torch.optim.lr_scheduler import CosineAnnealingLR, LinearLR, SequentialLR
 from torch.utils.data import DataLoader
 
 from dataset import TinyfactsDataset
@@ -74,6 +75,15 @@ def train(model_name: str, dry_run: bool = False):
     optimizer = torch.optim.AdamW(model.parameters(), lr=config.get("learning_rate", 3e-4))
 
     max_steps = 2 if dry_run else config.get("max_steps", 10000)
+    min_lr = config.get("min_lr", 1e-5)
+    warmup_steps = 0 if dry_run else config.get("warmup_steps", 0)
+
+    if warmup_steps > 0:
+        warmup = LinearLR(optimizer, start_factor=1e-8, end_factor=1.0, total_iters=warmup_steps)
+        cosine = CosineAnnealingLR(optimizer, T_max=max_steps - warmup_steps, eta_min=min_lr)
+        scheduler = SequentialLR(optimizer, schedulers=[warmup, cosine], milestones=[warmup_steps])
+    else:
+        scheduler = CosineAnnealingLR(optimizer, T_max=max_steps, eta_min=min_lr)
     eval_interval = config.get("eval_interval", 500)
     checkpoint_interval = config.get("checkpoint_interval", 1000)
 
@@ -106,12 +116,14 @@ def train(model_name: str, dry_run: bool = False):
         epoch = step / steps_per_epoch
         tokens_seen = step * batch_size * config["context_size"]
         elapsed = time.time() - train_start
+        lr = scheduler.get_last_lr()[0]
         entry = {
             "step": step,
             "epoch": round(epoch, 3),
             "loss": round(avg_loss, 6),
             "perplexity": round(perplexity, 4),
             "accuracy": round(accuracy, 6),
+            "lr": lr,
             "tokens_seen": tokens_seen,
             "elapsed_s": round(elapsed, 2),
             "timestamp": datetime.now().isoformat(),
@@ -120,7 +132,8 @@ def train(model_name: str, dry_run: bool = False):
             f.write(json.dumps(entry) + "\n")
         print(
             f"step {step:>6}/{max_steps} | epoch {epoch:.2f} | "
-            f"loss {avg_loss:.4f} | ppl {perplexity:.2f} | acc {accuracy:.3f}"
+            f"loss {avg_loss:.4f} | ppl {perplexity:.2f} | acc {accuracy:.3f} | "
+            f"lr {lr:.2e}"
         )
         return entry
 
@@ -138,6 +151,7 @@ def train(model_name: str, dry_run: bool = False):
         loss.backward()
         torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
         optimizer.step()
+        scheduler.step()
 
         # Accumulate stats (detached — no grad overhead)
         with torch.no_grad():

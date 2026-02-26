@@ -11,6 +11,7 @@ dependencies = [
     "numpy>=2.4.0",
     "scipy>=1.16.3",
     "tinyfacts-gen",
+    "torch>=2.10.0",
 ]
 
 [tool.uv.workspace]
@@ -20,3 +21,8 @@ members = [
 
 [tool.uv.sources]
 tinyfacts-gen = { workspace = true }
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.2",
+]

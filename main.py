@@ -94,5 +94,57 @@ def inspect(
     typer.echo("")
 
 
+# ── generate ───────────────────────────────────────────────────────────────────
+
+@app.command()
+def generate(
+    model_name: Annotated[str, typer.Argument(help="Model folder name under models/")],
+    prompt: Annotated[str, typer.Argument(help="Text prompt to continue from")],
+    checkpoint: Annotated[Optional[Path], typer.Option(help="Checkpoint .pt file (default: latest)")] = None,
+    tokens: Annotated[int, typer.Option(help="Number of tokens to generate")] = 100,
+    temperature: Annotated[float, typer.Option(help="Sampling temperature (0 = greedy)")] = 1.0,
+    top_k: Annotated[int, typer.Option(help="Top-k sampling (0 = disabled)")] = 0,
+):
+    """Generate text from a prompt using a trained model checkpoint."""
+    from generate import generate_tokens
+
+    # Resolve checkpoint — default to latest
+    if checkpoint is None:
+        checkpoint_dir = MODELS_DIR / model_name / "checkpoints"
+        candidates = sorted(checkpoint_dir.glob("*.pt")) if checkpoint_dir.exists() else []
+        if not candidates:
+            typer.echo(f"No checkpoints found in {checkpoint_dir}", err=True)
+            raise typer.Exit(1)
+        checkpoint = candidates[-1]
+        typer.echo(f"Using checkpoint: {checkpoint.name}")
+
+    if not checkpoint.exists():
+        typer.echo(f"Checkpoint not found: {checkpoint}", err=True)
+        raise typer.Exit(1)
+
+    state = torch.load(checkpoint, map_location="cpu", weights_only=True)
+    config = state["config"]
+    step = state.get("step", "?")
+    typer.echo(f"Trained to step: {step:,}" if isinstance(step, int) else f"Trained to step: {step}")
+
+    module = load_model_module(model_name)
+    tokenizer = WordTokenizer(ignore_case=True, digits=True)
+    model = module.build_model(config, vocab_size=tokenizer.vocab_size)
+    model.load_state_dict(state["model_state_dict"])
+
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    model = model.to(device)
+
+    typer.echo(f"\nPrompt: {prompt}")
+    typer.echo("─" * 40)
+
+    generated, _ = generate_tokens(
+        model, tokenizer, prompt,
+        n_tokens=tokens, temperature=temperature, top_k=top_k, device=device,
+    )
+
+    typer.echo(f"{prompt} {generated}\n")
+
+
 if __name__ == "__main__":
     app()

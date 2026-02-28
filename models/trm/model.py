@@ -95,6 +95,11 @@ class TRM(nn.Module):
 
     # ------------------------------------------------------------------
     # Standard forward — used by generate.py and inspect command
+    #
+    # NOTE: forward() is inference-only. During training, train.py's deep
+    # supervision loop calls embed(), latent_recursion(), head(), and
+    # q_head() directly — it does NOT call forward(). q_head is only used
+    # by train.py's deep supervision loop, not by forward().
     # ------------------------------------------------------------------
 
     def forward(self, idx: torch.Tensor) -> torch.Tensor:

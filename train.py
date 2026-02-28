@@ -84,6 +84,14 @@ def train(model_name: str, dry_run: bool = False):
         scheduler = SequentialLR(optimizer, schedulers=[warmup, cosine], milestones=[warmup_steps])
     else:
         scheduler = CosineAnnealingLR(optimizer, T_max=max_steps, eta_min=min_lr)
+    n_supervision = config.get("n_supervision", 0)
+    n_recursions  = config.get("n_recursions", 6)
+    T_cycles      = config.get("T", 3)
+    ema_decay     = config.get("ema_decay", 0.0)
+    ema_state = None
+    if ema_decay > 0:
+        ema_state = {k: v.clone().detach() for k, v in model.state_dict().items()}
+
     eval_interval = config.get("eval_interval", 500)
     checkpoint_interval = config.get("checkpoint_interval", 1000)
 
@@ -145,20 +153,85 @@ def train(model_name: str, dry_run: bool = False):
             x, y = next(data_iter)
 
         x, y = x.to(device), y.to(device)
-        optimizer.zero_grad()
-        logits = model(x)  # (B, T, vocab_size)
-        loss = F.cross_entropy(logits.view(-1, vocab_size), y.view(-1))
-        loss.backward()
-        torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
-        optimizer.step()
-        scheduler.step()
+
+        if n_supervision > 0 and hasattr(model, "latent_recursion"):
+            # ── Deep supervision (TRM) ──────────────────────────────────
+            n_embd = config["n_embd"]
+            y_lat = torch.zeros(x.shape[0], x.shape[1], n_embd, device=device)
+            z_lat = torch.zeros_like(y_lat)
+
+            total_loss = 0.0
+            last_logits = None
+            steps_taken = 0
+
+            for _sup in range(n_supervision):
+                optimizer.zero_grad()
+
+                # Re-embed with latest weights each supervision step
+                x_emb = model.embed(x)
+
+                # T-1 warm-up cycles — improve y_lat/z_lat without grad
+                with torch.no_grad():
+                    for _ in range(T_cycles - 1):
+                        y_lat, z_lat = model.latent_recursion(
+                            x_emb.detach(), y_lat, z_lat, n_recursions
+                        )
+
+                # Final cycle — full gradient through n+1 transformer calls
+                y_new, z_new = model.latent_recursion(x_emb, y_lat, z_lat, n_recursions)
+                logits = model.head(y_new)          # [B, L, vocab_size]
+                q_logit = model.q_head(y_new).mean()  # scalar
+
+                # Language-model loss
+                lm_loss = F.cross_entropy(logits.view(-1, vocab_size), y.view(-1))
+                # Halt loss: teach q to predict whether the current answer is correct
+                with torch.no_grad():
+                    correct = (logits.detach().argmax(-1) == y).float().mean()
+                halt_loss = F.binary_cross_entropy(torch.sigmoid(q_logit), correct)
+                loss = lm_loss + halt_loss
+
+                loss.backward()
+                torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+                optimizer.step()
+
+                total_loss += loss.item()
+                last_logits = logits.detach()
+                steps_taken += 1
+                y_lat = y_new.detach()
+                z_lat = z_new.detach()
+
+                # Early stopping: q_logit > 0 ↔ sigmoid > 0.5
+                if q_logit.item() > 0:
+                    break
+
+            # EMA update after all supervision steps
+            if ema_state is not None:
+                with torch.no_grad():
+                    for k, v in model.state_dict().items():
+                        ema_state[k].mul_(ema_decay).add_(v, alpha=1.0 - ema_decay)
+
+            scheduler.step()
+            logits    = last_logits
+            loss_item = total_loss / steps_taken
+
+        else:
+            # ── Standard single-step (gpt_small etc.) ──────────────────
+            optimizer.zero_grad()
+            logits = model(x)
+            loss = F.cross_entropy(logits.view(-1, vocab_size), y.view(-1))
+            loss.backward()
+            torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+            optimizer.step()
+            scheduler.step()
+            logits    = logits.detach()
+            loss_item = loss.item()
 
         # Accumulate stats (detached — no grad overhead)
         with torch.no_grad():
-            preds = logits.detach().argmax(dim=-1)
+            preds = logits.argmax(dim=-1)
             acc_correct += (preds == y).sum().item()
-            acc_tokens += y.numel()
-        acc_loss += loss.item()
+            acc_tokens  += y.numel()
+        acc_loss  += loss_item
         acc_steps += 1
         step += 1
 
@@ -167,26 +240,30 @@ def train(model_name: str, dry_run: bool = False):
             acc_loss = acc_correct = acc_tokens = acc_steps = 0
 
         if not dry_run and step % checkpoint_interval == 0:
-            _save_checkpoint(model, optimizer, config, step, checkpoint_dir, model_name)
+            _save_checkpoint(model, optimizer, config, step, checkpoint_dir, model_name,
+                             ema_state=ema_state)
 
     # Always flush remaining accumulated stats at the end
     if acc_steps > 0:
         flush_stats()
 
     if not dry_run:
-        _save_checkpoint(model, optimizer, config, step, checkpoint_dir, model_name)
+        _save_checkpoint(model, optimizer, config, step, checkpoint_dir, model_name,
+                         ema_state=ema_state)
         print("Training complete.")
     else:
         print("Dry run complete.")
 
 
-def _save_checkpoint(model, optimizer, config, step, checkpoint_dir, model_name):
+def _save_checkpoint(model, optimizer, config, step, checkpoint_dir, model_name,
+                     ema_state=None):
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filename = checkpoint_dir / f"{model_name}_{timestamp}_step{step}.pt"
+    filename  = checkpoint_dir / f"{model_name}_{timestamp}_step{step}.pt"
+    state_dict = ema_state if ema_state is not None else model.state_dict()
     torch.save(
         {
             "step": step,
-            "model_state_dict": model.state_dict(),
+            "model_state_dict": state_dict,
             "optimizer_state_dict": optimizer.state_dict(),
             "config": config,
         },

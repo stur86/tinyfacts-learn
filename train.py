@@ -20,13 +20,46 @@ MODELS_DIR = Path(__file__).parent / "models"
 
 
 def load_model_module(model_name: str):
-    model_dir = MODELS_DIR / model_name
-    if not model_dir.exists():
-        raise ValueError(f"Model directory not found: {model_dir}")
+    def _validate_model_ref(ref: str) -> str:
+        ref = ref.strip()
+        if not ref:
+            raise ValueError("model.source is empty")
+        # Treat model names as folder names under models/ (no path traversal)
+        if any(sep in ref for sep in ("/", "\\")) or ref in (".", "..") or ".." in ref:
+            raise ValueError(f"Invalid model.source reference: {ref!r}")
+        return ref
+
+    def _resolve_model_dir(start_name: str) -> tuple[str, Path]:
+        chain: list[str] = []
+        current = start_name
+
+        while True:
+            if current in chain:
+                loop = " -> ".join(chain + [current])
+                raise ValueError(f"model.source cycle detected: {loop}")
+            chain.append(current)
+
+            current_dir = MODELS_DIR / current
+            if not current_dir.exists():
+                raise ValueError(f"Model directory not found: {current_dir}")
+
+            source_file = current_dir / "model.source"
+            if source_file.exists():
+                target = _validate_model_ref(source_file.read_text())
+                current = target
+                continue
+
+            return current, current_dir
+
+    resolved_name, model_dir = _resolve_model_dir(model_name)
     model_file = model_dir / "model.py"
     if not model_file.exists():
-        raise ValueError(f"model.py not found in {model_dir}")
-    spec = importlib.util.spec_from_file_location(f"{model_name}_model", model_file)
+        raise ValueError(
+            f"model.py not found in {model_dir} (resolved from {model_name!r} -> {resolved_name!r})"
+        )
+
+    spec_name = f"{model_name}_model_from_{resolved_name}"
+    spec = importlib.util.spec_from_file_location(spec_name, model_file)
     if spec is None or spec.loader is None:
         raise RuntimeError(f"Failed to load model module from {model_file}")
     module = importlib.util.module_from_spec(spec)

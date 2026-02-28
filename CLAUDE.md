@@ -25,8 +25,17 @@ Known OOV files in `claude_sonnet_4_5_created/`: `how_music_works.txt` ("blow"),
 
 Each model lives in its own folder under `models/`. Every model folder must contain:
 
-- `model.py` — exports `build_model(config: dict, vocab_size: int) -> nn.Module`
 - `config.json` — hyperparameters and training settings (see keys below)
+
+And must contain either:
+
+- `model.py` — exports `build_model(config: dict, vocab_size: int) -> nn.Module`
+
+OR
+
+- `model.source` — a plain text file containing the name of another model folder under `models/`.
+	If present, the CLI loads `model.py` from the referenced folder, but still uses the *current* folder’s
+	`config.json`, checkpoints, and runs. This allows multiple configs to share one architecture implementation.
 
 Checkpoints are saved to `models/<name>/checkpoints/<name>_<timestamp>_step<N>.pt` as `{step, model_state_dict, optimizer_state_dict, config}`.
 
@@ -113,6 +122,8 @@ Run with `uv run pytest tests/ -v` (23 tests).
 
 ## Adding a new model
 
-1. Create `models/<name>/` with `model.py` (must export `build_model(config, vocab_size)`) and `config.json`
+1. Create `models/<name>/` with `config.json` and either:
+	- `model.py` (must export `build_model(config, vocab_size)`), or
+	- `model.source` containing another model folder name to reuse its `model.py`
 2. Add the model name to the `subfolders` list in its config if needed
 3. Train: `uv run python main.py train <name>`

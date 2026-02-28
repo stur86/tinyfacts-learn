@@ -124,9 +124,24 @@ def generate(
     tokens: Annotated[int, typer.Option(help="Number of tokens to generate")] = 100,
     temperature: Annotated[float, typer.Option(help="Sampling temperature (0 = greedy)")] = 0.5,
     top_k: Annotated[int, typer.Option(help="Top-k sampling (0 = disabled)")] = 10,
+    prompt: Annotated[
+        Optional[str],
+        typer.Option(
+            help="Non-interactive: generate once from this prompt and exit. If omitted, enter interactive mode."
+        ),
+    ] = None,
 ):
-    """Interactively generate text — loads a checkpoint then prompts for input."""
+    """Generate text from a checkpoint.
+
+    If --prompt is provided, runs once and prints the completion.
+    Otherwise, enters interactive prompt mode.
+    """
     from generate import generate_tokens
+
+    non_interactive = prompt is not None
+
+    def _log(msg: str) -> None:
+        typer.echo(msg, err=non_interactive)
 
     # Resolve checkpoint — default to latest
     if checkpoint is None:
@@ -136,7 +151,7 @@ def generate(
             typer.echo(f"No checkpoints found in {checkpoint_dir}", err=True)
             raise typer.Exit(1)
         checkpoint = candidates[-1]
-        typer.echo(f"Using checkpoint: {checkpoint.name}")
+        _log(f"Using checkpoint: {checkpoint.name}")
 
     if not checkpoint.exists():
         typer.echo(f"Checkpoint not found: {checkpoint}", err=True)
@@ -145,7 +160,7 @@ def generate(
     state = torch.load(checkpoint, map_location="cpu", weights_only=True)
     config = state["config"]
     step = state.get("step", "?")
-    typer.echo(f"Trained to step: {step:,}" if isinstance(step, int) else f"Trained to step: {step}")
+    _log(f"Trained to step: {step:,}" if isinstance(step, int) else f"Trained to step: {step}")
 
     module = load_model_module(model_name)
     tokenizer = WordTokenizer(ignore_case=True, digits=True)
@@ -154,6 +169,29 @@ def generate(
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
     model = model.to(device)
+
+    if non_interactive:
+        prompt_text = (prompt or "").strip()
+        if not prompt_text:
+            typer.echo("Error: --prompt cannot be empty.", err=True)
+            raise typer.Exit(2)
+        try:
+            generated, _ = generate_tokens(
+                model,
+                tokenizer,
+                prompt_text,
+                n_tokens=tokens,
+                temperature=temperature,
+                top_k=top_k,
+                device=device,
+            )
+        except ValueError as e:
+            typer.echo(f"Error: {e}", err=True)
+            raise typer.Exit(2)
+
+        out = f"{prompt_text} {generated}".strip()
+        typer.echo(out)
+        return
 
     typer.echo(f"\nModel ready. Generating {tokens} tokens per prompt.")
     typer.echo("Enter a prompt and press Enter. Ctrl+C to quit.\n")

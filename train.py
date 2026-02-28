@@ -180,14 +180,16 @@ def train(model_name: str, dry_run: bool = False):
                 # Final cycle — full gradient through n+1 transformer calls
                 y_new, z_new = model.latent_recursion(x_emb, y_lat, z_lat, n_recursions)
                 logits = model.head(y_new)          # [B, L, vocab_size]
-                q_logit = model.q_head(y_new).mean()  # scalar
+                # Average over [B, L, 1] → scalar halt signal; q_head init=0 so
+                # strict >0 early-stop never fires on the very first training step.
+                q_logit = model.q_head(y_new).mean()
 
                 # Language-model loss
                 lm_loss = F.cross_entropy(logits.view(-1, vocab_size), y.view(-1))
                 # Halt loss: teach q to predict whether the current answer is correct
                 with torch.no_grad():
                     correct = (logits.detach().argmax(-1) == y).float().mean()
-                halt_loss = F.binary_cross_entropy(torch.sigmoid(q_logit), correct)
+                halt_loss = F.binary_cross_entropy_with_logits(q_logit, correct)
                 loss = lm_loss + halt_loss
 
                 loss.backward()

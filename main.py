@@ -122,8 +122,8 @@ def generate(
     model_name: Annotated[str, typer.Argument(help="Model folder name under models/")],
     checkpoint: Annotated[Optional[Path], typer.Option(help="Checkpoint .pt file (default: latest)")] = None,
     tokens: Annotated[int, typer.Option(help="Number of tokens to generate")] = 100,
-    temperature: Annotated[float, typer.Option(help="Sampling temperature (0 = greedy)")] = 1.0,
-    top_k: Annotated[int, typer.Option(help="Top-k sampling (0 = disabled)")] = 0,
+    temperature: Annotated[float, typer.Option(help="Sampling temperature (0 = greedy)")] = 0.5,
+    top_k: Annotated[int, typer.Option(help="Top-k sampling (0 = disabled)")] = 10,
 ):
     """Interactively generate text — loads a checkpoint then prompts for input."""
     from generate import generate_tokens

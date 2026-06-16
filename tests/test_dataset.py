@@ -2,7 +2,7 @@
 import pytest
 import torch
 from pathlib import Path
-from dataset import TinyfactsDataset, TINYFACTS_GEN_DIR
+from tinyfacts_learn.dataset import TinyfactsDataset, TINYFACTS_GEN_DIR
 
 CONTEXT_SIZE = 8  # small for tests
 

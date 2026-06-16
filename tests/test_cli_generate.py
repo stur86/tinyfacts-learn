@@ -8,7 +8,7 @@ _REPO_ROOT = Path(__file__).parent.parent
 
 def test_generate_help_mentions_prompt_option():
     result = subprocess.run(
-        [sys.executable, "main.py", "generate", "--help"],
+        [sys.executable, "-m", "tinyfacts_learn.main", "generate", "--help"],
         capture_output=True,
         text=True,
         cwd=str(_REPO_ROOT),

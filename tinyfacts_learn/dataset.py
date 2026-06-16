@@ -5,11 +5,11 @@ from pathlib import Path
 import torch
 from torch.utils.data import Dataset
 
-from tinyfacts.check_words import check_words, split_words
-from tokenizers import WordTokenizer
+from tinyfacts.check_words import check_words_with_context
+from .tokenizers import WordTokenizer
 
 # Root of the tinyfacts-gen submodule, relative to this file
-TINYFACTS_GEN_DIR = Path(__file__).parent / "tinyfacts-gen"
+TINYFACTS_GEN_DIR = Path(__file__).parent.parent / "tinyfacts-gen"
 
 
 class TinyfactsDataset(Dataset):
@@ -46,11 +46,12 @@ class TinyfactsDataset(Dataset):
             txt_files = sorted(subfolder.glob("*.txt"))
             for txt_file in txt_files:
                 text = txt_file.read_text(encoding="utf-8")
-                invalid = check_words(split_words(text))
+                result = check_words_with_context(text)
+                invalid = {item.word for item in result.invalid_words}
                 if invalid:
                     msg = (
                         f"File '{txt_file}' contains {len(invalid)} invalid word(s): "
-                        f"{list(invalid.keys())[:5]}{'...' if len(invalid) > 5 else ''}"
+                        f"{list(invalid)[:5]}{'...' if len(invalid) > 5 else ''}"
                     )
                     if skip_invalid:
                         warnings.warn(msg)

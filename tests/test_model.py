@@ -86,7 +86,7 @@ def test_train_dry_run():
     """Training via main.py hub must complete a dry run without error."""
     import subprocess, sys
     result = subprocess.run(
-        [sys.executable, "main.py", "train", "gpt_small", "--dry-run"],
+        [sys.executable, "-m", "tinyfacts_learn.main", "train", "gpt_small", "--dry-run"],
         capture_output=True,
         text=True,
         cwd=str(_REPO_ROOT),
@@ -102,7 +102,7 @@ def test_train_dry_run_writes_stats():
     before = set(runs_dir.glob("run_*.jsonl")) if runs_dir.exists() else set()
 
     result = subprocess.run(
-        [sys.executable, "main.py", "train", "gpt_small", "--dry-run"],
+        [sys.executable, "-m", "tinyfacts_learn.main", "train", "gpt_small", "--dry-run"],
         capture_output=True,
         text=True,
         cwd=str(_REPO_ROOT),

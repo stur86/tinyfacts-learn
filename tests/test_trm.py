@@ -111,7 +111,7 @@ def test_head_and_q_head_accessible():
 def test_train_dry_run():
     import subprocess, sys
     result = subprocess.run(
-        [sys.executable, "main.py", "train", "trm", "--dry-run"],
+        [sys.executable, "-m", "tinyfacts_learn.main", "train", "trm", "--dry-run"],
         capture_output=True, text=True, cwd=str(_REPO_ROOT),
     )
     assert result.returncode == 0, (
@@ -125,7 +125,7 @@ def test_train_dry_run_writes_stats():
     before = set(runs_dir.glob("run_*.jsonl")) if runs_dir.exists() else set()
 
     result = subprocess.run(
-        [sys.executable, "main.py", "train", "trm", "--dry-run"],
+        [sys.executable, "-m", "tinyfacts_learn.main", "train", "trm", "--dry-run"],
         capture_output=True, text=True, cwd=str(_REPO_ROOT),
     )
     assert result.returncode == 0, f"Dry run failed:\n{result.stderr}"

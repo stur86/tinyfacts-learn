@@ -7,8 +7,8 @@ from typing import Annotated, Optional
 import torch
 import typer
 
-from tokenizers import WordTokenizer
-from train import MODELS_DIR, load_config, load_model_module
+from tinyfacts_learn.tokenizers import WordTokenizer
+from tinyfacts_learn.train import MODELS_DIR, load_config, load_model_module
 
 app = typer.Typer(help="tinyfacts-learn: train and inspect small language models.")
 
@@ -21,7 +21,7 @@ def train(
     dry_run: Annotated[bool, typer.Option("--dry-run", help="Run 2 steps and exit")] = False,
 ):
     """Train a model."""
-    from train import train as run_train
+    from tinyfacts_learn.train import train as run_train
     run_train(model_name, dry_run=dry_run)
 
 
@@ -101,7 +101,7 @@ def report(
     jsonl_file: Annotated[Path, typer.Argument(help="Path to a run_*.jsonl stats file")],
 ):
     """Generate a report folder with plots from a training run JSONL file."""
-    from report import generate_report
+    from tinyfacts_learn.report import generate_report
 
     if not jsonl_file.exists():
         typer.echo(f"File not found: {jsonl_file}", err=True)
@@ -136,7 +136,7 @@ def generate(
     If --prompt is provided, runs once and prints the completion.
     Otherwise, enters interactive prompt mode.
     """
-    from generate import generate_tokens
+    from tinyfacts_learn.generate import generate_tokens
 
     non_interactive = prompt is not None
 

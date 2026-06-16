@@ -3,7 +3,7 @@
 import torch
 import torch.nn as nn
 
-from tokenizers import WordTokenizer
+from .tokenizers import WordTokenizer
 
 
 def _sample_token(logits: torch.Tensor, temperature: float, top_k: int) -> int:

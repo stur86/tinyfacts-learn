@@ -4,7 +4,7 @@ import math
 import pytest
 from pathlib import Path
 
-from report import generate_report
+from tinyfacts_learn.report import generate_report
 
 
 @pytest.fixture()

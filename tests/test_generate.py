@@ -4,8 +4,8 @@ import json
 import torch
 from pathlib import Path
 
-from tokenizers import WordTokenizer
-from generate import generate_tokens
+from tinyfacts_learn.tokenizers import WordTokenizer
+from tinyfacts_learn.generate import generate_tokens
 
 _REPO_ROOT = Path(__file__).parent.parent
 CONFIG_PATH = _REPO_ROOT / "models/gpt_small/config.json"

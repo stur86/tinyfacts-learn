@@ -1,6 +1,6 @@
 import pytest
 
-import train
+from tinyfacts_learn import train
 
 
 def test_load_model_module_via_model_source(monkeypatch, tmp_path):

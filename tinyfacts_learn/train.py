@@ -13,10 +13,10 @@ import torch.nn.functional as F
 from torch.optim.lr_scheduler import CosineAnnealingLR, LinearLR, SequentialLR
 from torch.utils.data import DataLoader
 
-from dataset import TinyfactsDataset
-from tokenizers import WordTokenizer
+from .dataset import TinyfactsDataset
+from .tokenizers import WordTokenizer
 
-MODELS_DIR = Path(__file__).parent / "models"
+MODELS_DIR = Path(__file__).parent.parent / "models"
 
 
 def load_model_module(model_name: str):

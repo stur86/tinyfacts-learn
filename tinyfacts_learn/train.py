@@ -105,6 +105,14 @@ def train(model_name: str, dry_run: bool = False):
     n_params = sum(p.numel() for p in model.parameters())
     print(f"Model parameters: {n_params:,}")
 
+    if not dry_run:
+        if device == "cuda" and torch.cuda.get_device_capability()[0] < 7:
+            compile_backend = "cudagraphs"
+        else:
+            compile_backend = "inductor"
+        print(f"Compiling model with torch.compile (backend={compile_backend}, first step will be slow)...")
+        model = torch.compile(model, backend=compile_backend)
+
     optimizer = torch.optim.AdamW(model.parameters(), lr=config.get("learning_rate", 3e-4))
 
     max_steps = 2 if dry_run else config.get("max_steps", 10000)

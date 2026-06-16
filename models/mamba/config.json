@@ -1,7 +1,7 @@
 {
   "context_size": 128,
   "d_model": 128,
-  "n_layers": 6,
+  "n_layers": 4,
   "d_state": 16,
   "d_conv": 4,
   "expand": 2,
@@ -13,5 +13,13 @@
   "max_steps": 10000,
   "eval_interval": 500,
   "checkpoint_interval": 2000,
-  "subfolders": ["claude_sonnet_4_5_created", "gpt-5_1_created", "manually_created", "questions_gemini-3-flash-preview_cloud_created", "gemini-3-flash-preview_cloud_created"]
+  "subfolders": [
+    "claude_code_created",
+    "claude_sonnet_4_5_created",
+    "gpt-oss_120b-cloud_created",
+    "gpt-5_1_created",
+    "manually_created",
+    "questions_gemini-3-flash-preview_cloud_created",
+    "gemini-3-flash-preview_cloud_created"
+  ]
 }

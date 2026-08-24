@@ -105,9 +105,17 @@ npm run dev
 
 Pick a model from the dropdown, type the start of a sentence and let the model
 finish it. Words outside the 1000-word vocabulary are highlighted in red — the
-model reads all of them as the same `<UNK>` token. See
-[`webapp/README.md`](webapp/README.md) for details and for the (currently
-inactive) GitHub Pages deployment.
+model reads all of them as the same `<UNK>` token.
+
+Publishing to GitHub Pages is a manual step, since the exported models are not
+committed and CI would have nothing to deploy:
+
+```bash
+./scripts/deploy-webapp.sh --dry-run   # build and show what would be published
+./scripts/deploy-webapp.sh             # build and push it to the gh-pages branch
+```
+
+See [`webapp/README.md`](webapp/README.md) for details.
 
 ## Tests
 

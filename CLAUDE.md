@@ -129,9 +129,11 @@ See `webapp/README.md`. Points that matter when changing things:
 	if they are stale and `webapp/test/tokenizer.test.ts` checks the TS output against them.
 - **`segment()` returns spans as well as ids**, which is what drives the red highlighting of
 	words that tokenize to `<UNK>`.
-- **Deployment** is `.github/workflows/deploy-webapp.yml` (GitHub Pages). It has no automatic
-	trigger while the repo is private. CI cannot export models, so only models committed under
-	`webapp/public/models` get deployed.
+- **Deployment is manual**: `scripts/deploy-webapp.sh` builds `dist/` and pushes it to the
+	`gh-pages` branch (tree mirrors `dist`, one commit per deploy). There is deliberately no
+	GitHub Action — exported models are not committed, so CI would have nothing to publish.
+	The script refuses to deploy with an empty model folder; `--dry-run` builds and reports
+	without touching any branch.
 
 ## Key source files
 
@@ -149,6 +151,7 @@ See `webapp/README.md`. Points that matter when changing things:
 | `webapp/src/tokenizer.ts` | TypeScript port of `WordTokenizer`, with character spans |
 | `webapp/src/inference.ts` | ONNX Runtime Web session, sampling, generation loop |
 | `webapp/plugins/models-manifest.ts` | Vite plugin: scans `public/models` → `manifest.json` |
+| `scripts/deploy-webapp.sh` | Manual build + publish of the web app to the `gh-pages` branch |
 
 ## Tests
 

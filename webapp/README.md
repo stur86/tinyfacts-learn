@@ -69,9 +69,26 @@ not send the cross-origin-isolation headers that `SharedArrayBuffer` requires.
 
 ## Deploying
 
-`.github/workflows/deploy-webapp.yml` builds this app and publishes it to GitHub
-Pages. It has no automatic trigger while the repository is private — see the
-comments at the top of that file for how to enable it.
+Deployment is manual, by design: exported `.onnx` files are not committed, so a
+CI runner would have nothing to publish. `scripts/deploy-webapp.sh` runs from a
+machine that has the models:
 
-Because CI has no checkpoints to export from, only models **committed** under
-`public/models` are deployed.
+```bash
+uv run tinyfacts export gpt_small        # -> webapp/public/models/
+./scripts/deploy-webapp.sh
+```
+
+It refuses to publish an app with no models in `public/models`, builds
+`dist/`, and pushes it as one commit on the `gh-pages` branch, whose tree
+mirrors `dist` exactly.
+
+| Option | Effect |
+|--------|--------|
+| `--dry-run` | build and list what would be published; touch no branch |
+| `--skip-build` | publish the existing `dist/` as-is |
+| `--branch` / `--remote` | publish somewhere other than `origin`/`gh-pages` |
+| `--allow-no-models` | publish anyway with an empty model folder |
+
+One-time setup on GitHub: Settings → Pages → Build and deployment → Source:
+"Deploy from a branch", branch `gh-pages`, folder `/ (root)`. The `gh-pages`
+branch holds build output only — never edit it by hand or merge it anywhere.

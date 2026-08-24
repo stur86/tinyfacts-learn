@@ -18,3 +18,7 @@ models/*/checkpoints/*
 
 # Papers
 papers/*
+
+# Web app
+webapp/node_modules
+webapp/dist

@@ -1,0 +1,69 @@
+# Build the browser playground and publish it to GitHub Pages.
+#
+# INACTIVE ON PURPOSE. The repository is private, and GitHub Pages is not
+# available for private repositories on the free plan, so this workflow has no
+# automatic trigger — it only runs if someone starts it by hand from the
+# Actions tab. To turn it on once the repository is public:
+#
+#   1. Settings -> Pages -> Build and deployment -> Source: "GitHub Actions".
+#   2. Uncomment the `push` trigger below.
+#
+# Note that the app can only serve models that are committed under
+# webapp/public/models — the workflow has no checkpoints to export from.
+name: Deploy web app
+
+on:
+  workflow_dispatch:
+  # push:
+  #   branches: [main]
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Let a running deploy finish rather than cancelling it half-published.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+defaults:
+  run:
+    working-directory: webapp
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: webapp/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Test
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: webapp/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

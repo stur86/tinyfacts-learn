@@ -216,5 +216,63 @@ def generate(
             typer.echo(f"Error: {e}", err=True)
 
 
+# ── export ─────────────────────────────────────────────────────────────────────
+
+@app.command()
+def export(
+    model_name: Annotated[str, typer.Argument(help="Model folder name under models/")],
+    checkpoint: Annotated[Optional[Path], typer.Option(help="Checkpoint .pt file (default: latest)")] = None,
+    all_checkpoints: Annotated[
+        bool, typer.Option("--all", help="Export every checkpoint of this model, not just one")
+    ] = False,
+    out_dir: Annotated[
+        Optional[Path], typer.Option(help="Output folder (default: webapp/public/models)")
+    ] = None,
+):
+    """Export a checkpoint to ONNX for the browser web app.
+
+    Writes ``<checkpoint>.onnx`` plus a ``<checkpoint>.json`` metadata sidecar,
+    and refreshes ``tokenizer.json`` in the same folder.
+    """
+    from tinyfacts_learn.export_onnx import (
+        WEBAPP_MODELS_DIR,
+        export_model,
+        export_tokenizer,
+        latest_checkpoint,
+    )
+
+    target_dir = out_dir or WEBAPP_MODELS_DIR
+
+    if all_checkpoints:
+        if checkpoint is not None:
+            typer.echo("Error: --all and --checkpoint are mutually exclusive.", err=True)
+            raise typer.Exit(2)
+        checkpoint_dir = MODELS_DIR / model_name / "checkpoints"
+        targets = sorted(checkpoint_dir.glob("*.pt")) if checkpoint_dir.exists() else []
+        if not targets:
+            typer.echo(f"No checkpoints found in {checkpoint_dir}", err=True)
+            raise typer.Exit(1)
+    else:
+        try:
+            targets = [checkpoint if checkpoint is not None else latest_checkpoint(model_name)]
+        except ValueError as e:
+            typer.echo(f"Error: {e}", err=True)
+            raise typer.Exit(1)
+
+    for target in targets:
+        typer.echo(f"Exporting {target.name} ...")
+        try:
+            onnx_path, meta_path = export_model(model_name, checkpoint=target, out_dir=target_dir)
+        except ValueError as e:
+            typer.echo(f"Error: {e}", err=True)
+            raise typer.Exit(1)
+        size_mb = onnx_path.stat().st_size / 1e6
+        typer.echo(f"  {onnx_path}  ({size_mb:.2f} MB)")
+        typer.echo(f"  {meta_path}")
+
+    tokenizer_path = export_tokenizer(target_dir)
+    typer.echo(f"  {tokenizer_path}")
+
+
 if __name__ == "__main__":
     app()

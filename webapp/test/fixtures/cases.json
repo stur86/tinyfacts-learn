@@ -1,0 +1,204 @@
+[
+  {
+    "text": "the sun is a big ball of hot air",
+    "ids": [
+      792,
+      772,
+      960,
+      76,
+      0,
+      93,
+      71,
+      539,
+      385,
+      20
+    ],
+    "tokens": [
+      "the",
+      "sun",
+      "<VBZ>",
+      "be",
+      "a",
+      "big",
+      "ball",
+      "of",
+      "hot",
+      "air"
+    ],
+    "detokenized": "the sun is a big ball of hot air"
+  },
+  {
+    "text": "The Sun Gives Light",
+    "ids": [
+      792,
+      772,
+      960,
+      321,
+      456
+    ],
+    "tokens": [
+      "the",
+      "sun",
+      "<VBZ>",
+      "give",
+      "light"
+    ],
+    "detokenized": "the sun gives light"
+  },
+  {
+    "text": "cats and dogs run faster than birds",
+    "ids": [
+      960,
+      142,
+      34,
+      960,
+      217,
+      647,
+      955,
+      269,
+      788,
+      961
+    ],
+    "tokens": [
+      "<VBZ>",
+      "cat",
+      "and",
+      "<VBZ>",
+      "dog",
+      "run",
+      "<RBR>",
+      "fast",
+      "than",
+      "<UNK>"
+    ],
+    "detokenized": "cats and dogs run faster than <UNK>"
+  },
+  {
+    "text": "there are 42 things here",
+    "ids": [
+      797,
+      50,
+      936,
+      934,
+      954,
+      804,
+      370
+    ],
+    "tokens": [
+      "there",
+      "are",
+      "4",
+      "2",
+      "<NNS>",
+      "thing",
+      "here"
+    ],
+    "detokenized": "there are 42 things here"
+  },
+  {
+    "text": "water, air, and fire.",
+    "ids": [
+      869,
+      943,
+      20,
+      943,
+      34,
+      285,
+      942
+    ],
+    "tokens": [
+      "water",
+      ",",
+      "air",
+      ",",
+      "and",
+      "fire",
+      "."
+    ],
+    "detokenized": "water, air, and fire."
+  },
+  {
+    "text": "a man's hat",
+    "ids": [
+      0,
+      475,
+      948,
+      961,
+      961
+    ],
+    "tokens": [
+      "a",
+      "man",
+      "'",
+      "<UNK>",
+      "<UNK>"
+    ],
+    "detokenized": "a man' <UNK> <UNK>"
+  },
+  {
+    "text": "quantum entanglement of xylophones",
+    "ids": [
+      961,
+      961,
+      539,
+      961
+    ],
+    "tokens": [
+      "<UNK>",
+      "<UNK>",
+      "of",
+      "<UNK>"
+    ],
+    "detokenized": "<UNK> <UNK> of <UNK>"
+  },
+  {
+    "text": "the  sun\n  is\thot",
+    "ids": [
+      792,
+      772,
+      960,
+      76,
+      385
+    ],
+    "tokens": [
+      "the",
+      "sun",
+      "<VBZ>",
+      "be",
+      "hot"
+    ],
+    "detokenized": "the sun is hot"
+  },
+  {
+    "text": "no words at all: ;!?",
+    "ids": [
+      526,
+      960,
+      910,
+      60,
+      21,
+      944,
+      945,
+      946,
+      947
+    ],
+    "tokens": [
+      "no",
+      "<VBZ>",
+      "word",
+      "at",
+      "all",
+      ":",
+      ";",
+      "!",
+      "?"
+    ],
+    "detokenized": "no words at all:;!?"
+  },
+  {
+    "text": "",
+    "ids": [],
+    "tokens": [],
+    "detokenized": ""
+  }
+]

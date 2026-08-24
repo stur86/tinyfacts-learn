@@ -1,0 +1,266 @@
+:root {
+  --bg: #0f1115;
+  --panel: #171a21;
+  --panel-border: #262b36;
+  --text: #e6e8ee;
+  --muted: #9aa3b5;
+  --accent: #6ea8fe;
+  --unk: #ff6b6b;
+  --unk-bg: rgba(255, 107, 107, 0.22);
+  --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  --editor-font: var(--mono);
+  --editor-size: 1rem;
+  --editor-line: 1.6;
+  --editor-pad: 0.85rem;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg: #f7f8fa;
+    --panel: #ffffff;
+    --panel-border: #dfe3ea;
+    --text: #1b1f27;
+    --muted: #5c6577;
+    --accent: #1f6feb;
+    --unk: #c92a2a;
+    --unk-bg: rgba(201, 42, 42, 0.16);
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  line-height: 1.55;
+}
+
+.app {
+  max-width: 46rem;
+  margin: 0 auto;
+  padding: 2rem 1.25rem 3rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.app-header h1 {
+  margin: 0 0 0.35rem;
+  font-size: 1.6rem;
+  letter-spacing: -0.01em;
+}
+
+.subtitle {
+  margin: 0;
+  color: var(--muted);
+}
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 0.75rem;
+  padding: 1rem;
+}
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.control {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  font-size: 0.8rem;
+  color: var(--muted);
+  flex: 1 1 5rem;
+}
+
+.control-wide {
+  flex: 3 1 14rem;
+}
+
+select,
+input[type="number"],
+textarea {
+  font: inherit;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--panel-border);
+  border-radius: 0.45rem;
+  padding: 0.45rem 0.55rem;
+  width: 100%;
+}
+
+select:focus-visible,
+input:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.model-details {
+  margin: 0.75rem 0 0;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.field-label {
+  display: block;
+  font-size: 0.8rem;
+  color: var(--muted);
+  margin-bottom: 0.4rem;
+}
+
+/* The highlight overlay and the textarea are stacked and must agree on every
+   metric that affects text layout, or the highlights drift off the words. */
+.editor {
+  position: relative;
+}
+
+.editor-highlights,
+.editor textarea {
+  font-family: var(--editor-font);
+  font-size: var(--editor-size);
+  line-height: var(--editor-line);
+  padding: var(--editor-pad);
+  border: 1px solid var(--panel-border);
+  border-radius: 0.45rem;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  word-break: break-word;
+  margin: 0;
+}
+
+.editor-highlights {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  color: transparent;
+  background: var(--bg);
+  pointer-events: none;
+}
+
+.editor textarea {
+  position: relative;
+  display: block;
+  min-height: 7rem;
+  resize: vertical;
+  background: transparent;
+  caret-color: var(--accent);
+}
+
+mark.unk {
+  background: var(--unk-bg);
+  color: inherit;
+  border-bottom: 2px solid var(--unk);
+  border-radius: 2px;
+}
+
+.app-footer mark.unk {
+  color: var(--unk);
+}
+
+.vocab-note {
+  margin: 0.5rem 0 0;
+  font-size: 0.8rem;
+  color: var(--muted);
+  min-height: 1.2em;
+}
+
+.vocab-note.has-unknown {
+  color: var(--unk);
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-top: 0.9rem;
+  flex-wrap: wrap;
+}
+
+button {
+  font: inherit;
+  padding: 0.45rem 0.9rem;
+  border-radius: 0.45rem;
+  border: 1px solid var(--panel-border);
+  background: var(--panel);
+  color: var(--text);
+  cursor: pointer;
+}
+
+button.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #0b1220;
+  font-weight: 600;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.status {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.status[data-kind="error"] {
+  color: var(--unk);
+}
+
+.status[data-kind="busy"]::before {
+  content: "● ";
+  color: var(--accent);
+}
+
+.output-panel h2 {
+  margin: 0 0 0.6rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+
+.output {
+  margin: 0;
+  font-family: var(--mono);
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  min-height: 4rem;
+}
+
+.prompt-echo {
+  color: var(--muted);
+}
+
+.generated {
+  color: var(--text);
+}
+
+.placeholder {
+  color: var(--muted);
+  font-style: italic;
+}
+
+.app-footer {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.app-footer p {
+  margin: 0;
+}
+
+code {
+  font-family: var(--mono);
+  font-size: 0.95em;
+}

@@ -84,10 +84,36 @@ uv run tinyfacts report models/gpt_small/runs/run_<timestamp>.jsonl
 
 Plots are written to a folder named after the run file, alongside it.
 
+## Browser playground
+
+Export a checkpoint to ONNX and run it in the browser — no server, no Python:
+
+```bash
+uv run tinyfacts export gpt_small          # latest checkpoint
+uv run tinyfacts export gpt_small --all    # every checkpoint
+```
+
+This writes `<checkpoint>.onnx`, a `<checkpoint>.json` metadata sidecar, and the
+shared `tokenizer.json` into `webapp/public/models/`. The web app serves every
+`.onnx` it finds there:
+
+```bash
+cd webapp
+npm install
+npm run dev
+```
+
+Pick a model from the dropdown, type the start of a sentence and let the model
+finish it. Words outside the 1000-word vocabulary are highlighted in red — the
+model reads all of them as the same `<UNK>` token. See
+[`webapp/README.md`](webapp/README.md) for details and for the (currently
+inactive) GitHub Pages deployment.
+
 ## Tests
 
 ```bash
-uv run pytest tests/ -v
+uv run pytest tests/ -v          # Python
+cd webapp && npm test            # web app
 ```
 
 ## Adding a new model

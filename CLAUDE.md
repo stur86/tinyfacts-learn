@@ -96,6 +96,43 @@ uv run python main.py generate gpt_small --tokens 200 --temperature 0.8 --top-k 
 ```
 Loads the latest checkpoint (or `--checkpoint` path), then enters an interactive prompt loop. Type a prompt and press Enter; Ctrl+C to quit. Options: `--tokens` (default 100), `--temperature` (default 1.0; 0 = greedy), `--top-k` (default 0 = disabled).
 
+### export
+```bash
+uv run tinyfacts export gpt_small
+uv run tinyfacts export gpt_small --all                 # every checkpoint
+uv run tinyfacts export gpt_small --checkpoint <path>
+uv run tinyfacts export gpt_small --out-dir some/dir
+```
+Exports a checkpoint to ONNX for the browser web app. Writes `<checkpoint-stem>.onnx`,
+a `<checkpoint-stem>.json` metadata sidecar, and refreshes `tokenizer.json` — all into
+`webapp/public/models/` by default. Core logic is in `export_onnx.py`.
+
+The graph is exported with a **fixed** sequence length (`context_size`), single-file
+(`external_data=False`), via the dynamo exporter at opset 20. Opset 20 is a floor, not a
+preference: the exporter emits an opset-18 `Split` for mamba that an opset-17 graph cannot
+express. All models are causal, so callers right-pad a short prompt and read the logits at
+the last real position.
+
+## Web app — webapp/
+
+Client-only browser inference with ONNX Runtime Web (Vite + TypeScript, no framework).
+See `webapp/README.md`. Points that matter when changing things:
+
+- **The models folder is the source of truth.** `webapp/plugins/models-manifest.ts` scans
+	`webapp/public/models` for `.onnx` files and generates `models/manifest.json` — per request
+	in dev, as an emitted asset at build time. Adding a model means exporting it, nothing else.
+	A model with no `.json` sidecar still loads (`hasMetadata: false`).
+- **`webapp/src/tokenizer.ts` is a port of `WordTokenizer`** and must stay in step with it.
+	It loads the token table from `tokenizer.json` rather than rebuilding it, so only the
+	tokenize/detokenize *logic* is duplicated. After changing either side, regenerate the
+	fixtures with `python tests/test_webapp_fixtures.py`; `tests/test_webapp_fixtures.py` fails
+	if they are stale and `webapp/test/tokenizer.test.ts` checks the TS output against them.
+- **`segment()` returns spans as well as ids**, which is what drives the red highlighting of
+	words that tokenize to `<UNK>`.
+- **Deployment** is `.github/workflows/deploy-webapp.yml` (GitHub Pages). It has no automatic
+	trigger while the repo is private. CI cannot export models, so only models committed under
+	`webapp/public/models` get deployed.
+
 ## Key source files
 
 | File | Purpose |
@@ -105,9 +142,13 @@ Loads the latest checkpoint (or `--checkpoint` path), then enters an interactive
 | `train.py` | Core training logic (importable); JSONL stats; cosine LR scheduler |
 | `generate.py` | `generate_tokens(model, tokenizer, prompt, n_tokens, temperature, top_k)` |
 | `report.py` | `generate_report(jsonl_path)` → plots folder |
-| `main.py` | Typer CLI hub: `train`, `inspect`, `generate` |
+| `export_onnx.py` | `export_model()` / `export_tokenizer()` → ONNX + vocabulary for the web app |
+| `main.py` | Typer CLI hub: `train`, `inspect`, `report`, `generate`, `export` |
 | `models/gpt_small/model.py` | GPT-small transformer + `build_model` factory |
 | `models/gpt_small/config.json` | Hyperparameters + training settings |
+| `webapp/src/tokenizer.ts` | TypeScript port of `WordTokenizer`, with character spans |
+| `webapp/src/inference.ts` | ONNX Runtime Web session, sampling, generation loop |
+| `webapp/plugins/models-manifest.ts` | Vite plugin: scans `public/models` → `manifest.json` |
 
 ## Tests
 
@@ -119,6 +160,10 @@ Run with `uv run pytest tests/ -v` (23 tests).
 | `tests/test_model.py` | 9 tests — config, forward shape, param count, causal masking, dry-run, JSONL stats |
 | `tests/test_generate.py` | 5 tests — output type, token count, greedy determinism, empty-prompt error, top-k |
 | `tests/test_report.py` | 5 tests — output dir, individual PNGs, overview, naming, empty-file error |
+| `tests/test_export_onnx.py` | ONNX export — file layout, sidecar, graph signature, parity with PyTorch |
+| `tests/test_webapp_fixtures.py` | Web app tokenizer fixtures are current and self-consistent |
+
+Web app tests: `cd webapp && npm test` (vitest — tokenizer parity with Python, manifest scanning).
 
 ## Adding a new model
 

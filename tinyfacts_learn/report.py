@@ -1,6 +1,7 @@
 # report.py
 """Generate plots from a tinyfacts-learn training run JSONL file."""
 import json
+import math
 from pathlib import Path
 
 import matplotlib
@@ -18,21 +19,45 @@ def _load_run(jsonl_path: Path) -> dict[str, list]:
     return {k: [r[k] for r in rows if k in r] for k in keys}
 
 
+def _nice_epoch_step(max_epoch: float, target_ticks: int = 8) -> float:
+    """Pick a round epoch interval giving roughly `target_ticks` labels."""
+    if max_epoch <= 0:
+        return 1.0
+    raw = max_epoch / target_ticks
+    magnitude = 10 ** math.floor(math.log10(raw))
+    for mult in (1, 2, 2.5, 5, 10):
+        if magnitude * mult >= raw:
+            return magnitude * mult
+    return magnitude * 10
+
+
 def _epoch_ticks(ax, steps: list[float], epochs: list[float]):
-    """Add a secondary x-axis showing epoch numbers."""
+    """Add a secondary x-axis showing epoch numbers.
+
+    An epoch here is one full pass over the training corpus. With overlapping
+    windows and a large step budget that can reach the hundreds, so ticks are
+    placed at round intervals rather than at every integer boundary.
+    """
     ax2 = ax.twiny()
     ax2.set_xlim(ax.get_xlim())
-    # Place a tick at each integer epoch boundary
-    max_epoch = int(max(epochs)) + 1
-    epoch_steps = []
-    for e in range(1, max_epoch + 1):
-        # Interpolate the step at which epoch e was reached
+
+    max_epoch = max(epochs) if epochs else 0
+    interval = _nice_epoch_step(max_epoch)
+
+    epoch_steps: list[float] = []
+    labels: list[str] = []
+    e = interval
+    while e <= max_epoch:
+        # Find the first logged point at or past epoch e
         for i, ep in enumerate(epochs):
             if ep >= e:
                 epoch_steps.append(steps[i])
+                labels.append(f"{e:g}")
                 break
+        e += interval
+
     ax2.set_xticks(epoch_steps)
-    ax2.set_xticklabels([str(e) for e in range(1, len(epoch_steps) + 1)], fontsize=7)
+    ax2.set_xticklabels(labels, fontsize=7)
     ax2.set_xlabel("Epoch", fontsize=8)
 
 
@@ -44,8 +69,17 @@ def _plot_metric(
     color: str,
     ylabel: str,
     log_scale: bool = False,
+    val_values: list | None = None,
 ):
-    ax.plot(steps, values, color=color, linewidth=1.5, label=label)
+    has_val = bool(val_values)
+    ax.plot(steps, values, color=color, linewidth=1.5,
+            label="train" if has_val else label)
+    if has_val:
+        # Truncate to the shorter series in case a run was interrupted mid-flush
+        n = min(len(steps), len(val_values))
+        ax.plot(steps[:n], val_values[:n], color=color, linewidth=1.5,
+                linestyle="--", alpha=0.8, label="val")
+        ax.legend(fontsize=8)
     ax.set_xlabel("Step")
     ax.set_ylabel(ylabel)
     ax.set_title(label)
@@ -69,19 +103,19 @@ def generate_report(jsonl_path: Path) -> Path:
     out_dir.mkdir(exist_ok=True)
 
     metrics = [
-        ("loss",        data.get("loss", []),        "Loss",            "cross-entropy loss", "tab:blue",   False),
-        ("perplexity",  data.get("perplexity", []),  "Perplexity",      "perplexity",         "tab:orange", False),
-        ("accuracy",    data.get("accuracy", []),    "Top-1 Accuracy",  "accuracy",           "tab:green",  False),
-        ("lr",          data.get("lr", []),          "Learning Rate",   "learning rate",      "tab:red",    True),
+        ("loss",        data.get("loss", []),        "Loss",            "cross-entropy loss", "tab:blue",   False, data.get("val_loss", [])),
+        ("perplexity",  data.get("perplexity", []),  "Perplexity",      "perplexity",         "tab:orange", False, data.get("val_perplexity", [])),
+        ("accuracy",    data.get("accuracy", []),    "Top-1 Accuracy",  "accuracy",           "tab:green",  False, data.get("val_accuracy", [])),
+        ("lr",          data.get("lr", []),          "Learning Rate",   "learning rate",      "tab:red",    True,  []),
     ]
 
     # ── Individual plots ──────────────────────────────────────────────────────
     saved = []
-    for stem, values, title, ylabel, color, log_scale in metrics:
+    for stem, values, title, ylabel, color, log_scale, val_values in metrics:
         if not values:
             continue
         fig, ax = plt.subplots(figsize=(7, 4))
-        _plot_metric(ax, steps, values, title, color, ylabel, log_scale)
+        _plot_metric(ax, steps, values, title, color, ylabel, log_scale, val_values)
         _epoch_ticks(ax, steps, epochs)
         fig.tight_layout()
         path = out_dir / f"{stem}.png"
@@ -90,14 +124,14 @@ def generate_report(jsonl_path: Path) -> Path:
         saved.append(path)
 
     # ── 2×2 overview ─────────────────────────────────────────────────────────
-    available = [(s, v, t, y, c, ls) for s, v, t, y, c, ls in metrics if v]
+    available = [m for m in metrics if m[1]]
     if len(available) >= 2:
         fig, axes = plt.subplots(2, 2, figsize=(12, 8))
         fig.suptitle(f"Training run: {jsonl_path.stem}", fontsize=11)
         for idx, ax in enumerate(axes.flat):
             if idx < len(available):
-                stem, values, title, ylabel, color, log_scale = available[idx]
-                _plot_metric(ax, steps, values, title, color, ylabel, log_scale)
+                stem, values, title, ylabel, color, log_scale, val_values = available[idx]
+                _plot_metric(ax, steps, values, title, color, ylabel, log_scale, val_values)
             else:
                 ax.set_visible(False)
         fig.tight_layout()

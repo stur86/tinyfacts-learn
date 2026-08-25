@@ -11,6 +11,47 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
+def _parallel_scan(a: torch.Tensor, b: torch.Tensor) -> torch.Tensor:
+    """Parallel prefix scan for h[t] = a[t]*h[t-1] + b[t], h[-1] = 0.
+
+    Uses the associative operator (a2,b2)⊕(a1,b1) = (a2·a1, a2·b1+b2) to
+    reduce L serial steps to O(log L) parallel rounds.
+
+    Args:
+        a: [B, L, D, N] — per-step decay (dA)
+        b: [B, L, D, N] — per-step input (dB * x)
+    Returns:
+        h: [B, L, D, N] — hidden state at every position
+    """
+    B, L, D, N = b.shape
+    if L == 1:
+        return b
+
+    odd_last = L % 2 == 1
+    L_even = L - int(odd_last)
+
+    # Reduce: compose adjacent pairs (right ⊕ left)
+    a_l, b_l = a[:, :L_even:2], b[:, :L_even:2]   # even indices
+    a_r, b_r = a[:, 1:L_even:2], b[:, 1:L_even:2]  # odd indices
+    h_pairs = _parallel_scan(a_r * a_l, a_r * b_l + b_r)  # [B, L_even//2, D, N]
+
+    # Expand: reconstruct all positions without in-place ops
+    h_even_0 = b[:, :1]                                             # h[0] = b[0]
+    if L_even > 2:
+        h_even_rest = a[:, 2:L_even:2] * h_pairs[:, :-1] + b[:, 2:L_even:2]
+        h_even = torch.cat([h_even_0, h_even_rest], dim=1)          # [B, L_even//2, D, N]
+    else:
+        h_even = h_even_0
+
+    # Interleave even (0,2,4,…) and odd (1,3,5,…) positions
+    h = torch.stack([h_even, h_pairs], dim=2).reshape(B, L_even, D, N)
+
+    if odd_last:
+        h = torch.cat([h, a[:, -1:] * h[:, -1:] + b[:, -1:]], dim=1)
+
+    return h
+
+
 class MambaBlock(nn.Module):
     def __init__(self, d_model: int, d_state: int = 16, d_conv: int = 4, expand: int = 2):
         super().__init__()
@@ -71,20 +112,13 @@ class MambaBlock(nn.Module):
         dt = F.softplus(self.dt_proj(dt))  # [B, L, d_inner], strictly positive
 
         # Discretize via zero-order hold (simplified):
-        #   dA = exp(dt * A),  dB = dt * B
-        # dt: [B, L, d_inner, 1],  A: [d_inner, d_state] → broadcasts to [B, L, d_inner, d_state]
-        dA = torch.exp(dt.unsqueeze(-1) * A)        # [B, L, d_inner, d_state]
-        dB = dt.unsqueeze(-1) * B_mat.unsqueeze(2)  # [B, L, d_inner, d_state]
+        #   dA = exp(dt * A),  dBx = dt * B * x  (input contribution per step)
+        dA  = torch.exp(dt.unsqueeze(-1) * A)                            # [B, L, d_inner, d_state]
+        dBx = dt.unsqueeze(-1) * B_mat.unsqueeze(2) * x.unsqueeze(-1)   # [B, L, d_inner, d_state]
 
-        # Sequential scan: h_t = dA_t * h_{t-1} + dB_t * x_t,  y_t = C_t · h_t
-        # For L=128, a Python loop is fast enough; no custom CUDA kernel needed.
-        h = torch.zeros(B, self.d_inner, self.d_state, device=x.device, dtype=x.dtype)
-        ys = []
-        for t in range(L):
-            h = dA[:, t] * h + dB[:, t] * x[:, t].unsqueeze(-1)
-            y_t = (h * C[:, t].unsqueeze(1)).sum(-1)  # [B, d_inner]
-            ys.append(y_t)
-        y = torch.stack(ys, dim=1)  # [B, L, d_inner]
+        # Parallel prefix scan (O(log L) depth) instead of sequential loop
+        h = _parallel_scan(dA, dBx)               # [B, L, d_inner, d_state]
+        y = (h * C.unsqueeze(2)).sum(-1)           # [B, L, d_inner]
 
         return y + x * self.D  # skip connection
 

@@ -1,17 +1,20 @@
 {
   "context_size": 128,
-  "n_embd": 32,
+  "n_embd": 64,
   "n_heads": 4,
-  "n_layers": 1,
-  "ffn_dim": 64,
-  "dropout": 0.1,
-  "learning_rate": 0.0003,
+  "n_layers": 2,
+  "ffn_dim": 256,
+  "dropout": 0.0,
+  "learning_rate": 0.001,
   "min_lr": 1e-5,
-  "warmup_steps": 200,
-  "batch_size": 64,
-  "max_steps": 10000,
-  "eval_interval": 500,
-  "checkpoint_interval": 2000,
+  "warmup_steps": 1000,
+  "batch_size": 256,
+  "max_steps": 100000,
+  "eval_interval": 1000,
+  "checkpoint_interval": 10000,
+  "val_fraction": 0.05,
+  "val_batches": 20,
+  "split_seed": 0,
   "subfolders": [
     "claude_code_created",
     "claude_sonnet_4_5_created",
@@ -19,6 +22,7 @@
     "gpt-5_1_created",
     "manually_created",
     "questions_gemini-3-flash-preview_cloud_created",
-    "gemini-3-flash-preview_cloud_created"
+    "gemini-3-flash-preview_cloud_created",
+    "tinyfacts-llama_created"
   ]
 }

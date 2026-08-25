@@ -3685,6 +3685,7 @@ dependencies = [
     { name = "openai" },
     { name = "pydantic-ai" },
     { name = "python-dotenv" },
+    { name = "pyyaml" },
     { name = "textual" },
     { name = "typer" },
 ]
@@ -3697,6 +3698,7 @@ requires-dist = [
     { name = "openai", specifier = ">=1.99.6" },
     { name = "pydantic-ai", specifier = "==1.25.1" },
     { name = "python-dotenv", specifier = ">=1.1.1" },
+    { name = "pyyaml", specifier = ">=6.0" },
     { name = "textual", specifier = ">=6.7.0" },
     { name = "typer", specifier = ">=0.20.0" },
 ]

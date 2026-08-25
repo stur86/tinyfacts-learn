@@ -13,16 +13,46 @@ from tinyfacts_learn.train import MODELS_DIR, load_config, load_model_module
 app = typer.Typer(help="tinyfacts-learn: train and inspect small language models.")
 
 
+def _load_state_dict(state: dict) -> dict:
+    """Strip the _orig_mod. prefix that torch.compile adds to state dict keys."""
+    sd = state["model_state_dict"]
+    if any(k.startswith("_orig_mod.") for k in sd):
+        sd = {k.removeprefix("_orig_mod."): v for k, v in sd.items()}
+    return sd
+
+
 # ── train ──────────────────────────────────────────────────────────────────────
 
 @app.command()
 def train(
     model_name: Annotated[str, typer.Argument(help="Model folder name under models/")],
     dry_run: Annotated[bool, typer.Option("--dry-run", help="Run 2 steps and exit")] = False,
+    resume: Annotated[
+        Optional[Path],
+        typer.Option(help="Resume from a checkpoint .pt file, or 'latest' for the newest one"),
+    ] = None,
 ):
-    """Train a model."""
+    """Train a model.
+
+    With --resume, training continues from the checkpoint's step towards the
+    current config's max_steps, restoring optimizer and LR-scheduler state.
+    """
     from tinyfacts_learn.train import train as run_train
-    run_train(model_name, dry_run=dry_run)
+
+    if resume is not None and str(resume) == "latest":
+        checkpoint_dir = MODELS_DIR / model_name / "checkpoints"
+        candidates = sorted(checkpoint_dir.glob("*.pt")) if checkpoint_dir.exists() else []
+        if not candidates:
+            typer.echo(f"No checkpoints found in {checkpoint_dir}", err=True)
+            raise typer.Exit(1)
+        resume = candidates[-1]
+        typer.echo(f"Resuming from latest checkpoint: {resume.name}")
+
+    try:
+        run_train(model_name, dry_run=dry_run, resume=resume)
+    except ValueError as e:
+        typer.echo(f"Error: {e}", err=True)
+        raise typer.Exit(1)
 
 
 # ── inspect ────────────────────────────────────────────────────────────────────
@@ -70,7 +100,7 @@ def inspect(
             typer.echo(f"\nCheckpoint not found: {checkpoint}", err=True)
             raise typer.Exit(1)
         state = torch.load(checkpoint, map_location="cpu", weights_only=True)
-        model.load_state_dict(state["model_state_dict"])
+        model.load_state_dict(_load_state_dict(state))
         typer.echo(f"\nCheckpoint: {checkpoint}")
         typer.echo(f"  Trained to step: {state.get('step', '?'):,}")
 
@@ -165,7 +195,7 @@ def generate(
     module = load_model_module(model_name)
     tokenizer = WordTokenizer(ignore_case=True, digits=True)
     model = module.build_model(config, vocab_size=tokenizer.vocab_size)
-    model.load_state_dict(state["model_state_dict"])
+    model.load_state_dict(_load_state_dict(state))
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
     model = model.to(device)

@@ -10,20 +10,24 @@ def _():
     import marimo as mo
     import numpy as np
     from numpy.typing import NDArray
-    from pathlib import Path
-    return NDArray, Path, np, re
+    return NDArray, np, re
 
 
 @app.cell
-def _(Path, re):
-    files = []
-    for folder in ["tinyfacts-gen/gpt-5_1_created/", "tinyfacts-gen/manually_created/", "tinyfacts-gen/claude_sonnet_4_5_created/"]:
-        files += list(Path(folder).glob("*.txt"))
-    # files = [f for f in files if "big_water_car" not in f.name]
-    data = [f.read_text() for f in files]
+def _(re):
+    from tinyfacts_learn.hub_data import load_records
+
+    # The texts come from the dataset on the Hugging Face Hub. Name sources in
+    # the list below to narrow it down; leave it empty to use every row.
+    sources = ["gpt-5_1", "manually", "claude_sonnet_4_5"]
+
+    records, revision = load_records()
+    if sources:
+        records = [r for r in records if r.source in sources]
+    data = [r.text for r in records]
     all_text = '\n\n'.join(data)
 
-    print(f"Loaded {len(files)} files")
+    print(f"Loaded {len(records)} rows at revision {revision}")
     print(f"{len(all_text)} characters")
     print(f"Approximately {len(all_text.split())} words")
 

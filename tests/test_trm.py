@@ -1,5 +1,6 @@
 # tests/test_trm.py
 import json
+import pytest
 import torch
 import importlib.util
 from pathlib import Path
@@ -108,6 +109,7 @@ def test_head_and_q_head_accessible():
     assert q.shape == (BATCH, L, 1)
 
 
+@pytest.mark.network
 def test_train_dry_run():
     import subprocess, sys
     result = subprocess.run(
@@ -119,6 +121,7 @@ def test_train_dry_run():
     )
 
 
+@pytest.mark.network
 def test_train_dry_run_writes_stats():
     import subprocess, sys, json as _json
     runs_dir = _REPO_ROOT / "models" / "trm" / "runs"

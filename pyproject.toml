@@ -5,10 +5,12 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "huggingface-hub>=0.36.0",
     "marimo>=0.18.4",
     "matplotlib>=3.10.8",
     "miniml-jax>=0.6.0",
     "numpy>=2.3.0",
+    "python-dotenv>=1.1.1",
     "scipy>=1.16.3",
     "tinyfacts-gen",
     "torch>=2.10.0",
@@ -28,11 +30,6 @@ packages = ["tinyfacts_learn"]
 [tool.uv]
 package = true
 
-[tool.uv.workspace]
-members = [
-    "tinyfacts-gen",
-]
-
 [[tool.uv.index]]
 name = "pypi"
 url = "https://pypi.org/simple"
@@ -45,10 +42,16 @@ default = false
 explicit = true
 
 [tool.uv.sources]
-tinyfacts-gen = { workspace = true }
+tinyfacts-gen = { git = "https://github.com/stur86/tinyfacts-gen", rev = "c00b48664db8c2ae25b5bc5559da2ba3b3921515" }
 torch = { index = "pytorch-cu126" }
 
 [dependency-groups]
 dev = [
     "pytest>=9.0.2",
 ]
+
+[tool.pytest.ini_options]
+markers = [
+    "network: needs the Hugging Face Hub and a token (deselected by default)",
+]
+addopts = "-m 'not network'"

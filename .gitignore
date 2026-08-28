@@ -18,3 +18,5 @@ models/*/checkpoints/*
 
 # Papers
 papers/*
+# Secrets
+.env

@@ -21,6 +21,7 @@ const els = {
   stop: byId<HTMLButtonElement>("stop"),
   status: byId<HTMLSpanElement>("status"),
   output: byId<HTMLParagraphElement>("output"),
+  copy: byId<HTMLButtonElement>("copy"),
 };
 
 let tokenizer: WordTokenizer | null = null;
@@ -28,6 +29,8 @@ let entries: ModelEntry[] = [];
 let model: TinyModel | null = null;
 let loading: Promise<TinyModel> | null = null;
 let stopRequested = false;
+let outputText = "";
+let copyReset: ReturnType<typeof setTimeout> | undefined;
 
 function byId<T extends HTMLElement>(id: string): T {
   const el = document.getElementById(id);
@@ -144,9 +147,34 @@ function readNumber(input: HTMLInputElement, fallback: number): number {
 }
 
 function renderOutput(prompt: string, continuation: string): void {
+  // Kept in step with the markup below, so Copy hands over exactly what is on screen.
+  outputText = continuation ? `${prompt} ${continuation}` : prompt;
+  els.copy.disabled = outputText.length === 0;
   els.output.innerHTML =
     `<span class="prompt-echo">${escapeHtml(prompt)}</span>` +
     (continuation ? ` <span class="generated">${escapeHtml(continuation)}</span>` : "");
+}
+
+async function copyOutput(): Promise<void> {
+  if (!outputText) return;
+  if (!navigator.clipboard) {
+    setStatus("This browser context does not allow clipboard access.", "error");
+    return;
+  }
+  try {
+    await navigator.clipboard.writeText(outputText);
+    flashCopy("Copied");
+  } catch (error) {
+    setStatus(`Could not copy: ${errorText(error)}`, "error");
+  }
+}
+
+function flashCopy(label: string): void {
+  els.copy.textContent = label;
+  clearTimeout(copyReset);
+  copyReset = setTimeout(() => {
+    els.copy.textContent = "Copy";
+  }, 1400);
 }
 
 async function complete(): Promise<void> {
@@ -210,6 +238,7 @@ async function main(): Promise<void> {
     els.highlights.scrollLeft = els.prompt.scrollLeft;
   });
   els.complete.addEventListener("click", () => void complete());
+  els.copy.addEventListener("click", () => void copyOutput());
   els.stop.addEventListener("click", () => {
     stopRequested = true;
     setStatus("Stopping…", "busy");

@@ -221,12 +221,26 @@ button:disabled {
   color: var(--accent);
 }
 
+.output-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  margin-bottom: 0.6rem;
+}
+
 .output-panel h2 {
-  margin: 0 0 0.6rem;
+  margin: 0;
   font-size: 0.8rem;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.06em;
+  color: var(--muted);
+}
+
+button.copy {
+  padding: 0.25rem 0.6rem;
+  font-size: 0.8rem;
   color: var(--muted);
 }
 

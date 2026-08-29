@@ -1,0 +1,55 @@
+%% GPT-small — the shape of the architecture, not any one instance of it.
+%%
+%% Symbols. Everything but B and T is a key in this folder's config.json, so a
+%% sibling model that only carries a model.source (gpt_tiny) is the same diagram
+%% with different numbers.
+%%
+%%   B  batch size                     T  tokens in the sequence, T <= C
+%%   V  vocab_size (the tokenizer's)   C  context_size
+%%   D  n_embd                         H  n_heads
+%%   F  ffn_dim                        L  n_layers
+%%
+%% The blocks are nn.TransformerEncoderLayer with norm_first=True, stacked by
+%% nn.TransformerEncoder. Dropout is drawn because the architecture has it; the
+%% current config sets it to 0.0, since a model this small underfits anyway.
+%% Implementation: models/gpt_small/model.py
+
+flowchart TD
+    ids["Token ids<br/>B × T"]
+    pos["Positions 0 … T-1<br/>T"]
+    tok_emb["Token embedding<br/>lookup table V × D"]
+    pos_emb["Position embedding<br/>learned, table C × D"]
+    add_emb(("+"))
+    drop_emb["Dropout"]
+    mask["Causal mask<br/>T × T, everything above<br/>the diagonal masked out"]
+
+    ids --> tok_emb --> add_emb
+    pos --> pos_emb --> add_emb
+    add_emb --> drop_emb
+
+    subgraph block["Transformer block — repeated L times, pre-norm"]
+        direction TB
+        blk_in["Block input<br/>B × T × D"]
+        ln1["LayerNorm"]
+        attn["Causal multi-head self-attention<br/>H heads, each of width D/H"]
+        drop_attn["Dropout"]
+        add_attn(("+"))
+        ln2["LayerNorm"]
+        ffn["Feed-forward<br/>Linear D → F · GELU · Dropout · Linear F → D"]
+        drop_ffn["Dropout"]
+        add_ffn(("+"))
+
+        blk_in --> ln1 --> attn --> drop_attn --> add_attn
+        blk_in -->|residual| add_attn
+        add_attn --> ln2 --> ffn --> drop_ffn --> add_ffn
+        add_attn -->|residual| add_ffn
+    end
+
+    final_ln["LayerNorm<br/>once, after the last block"]
+    head["Output head<br/>Linear D → V, no bias"]
+    logits["Logits<br/>B × T × V"]
+
+    drop_emb --> blk_in
+    mask -.->|added to the attention scores| attn
+    add_ffn --> final_ln --> head --> logits
+    tok_emb -.->|tied weights| head

@@ -88,6 +88,10 @@ Training stats are written to `models/<name>/runs/run_<timestamp>.jsonl`, one JS
 
 `models/gpt_small/` — GPT-style transformer built on `nn.TransformerEncoderLayer` + `nn.TransformerEncoder` (pre-norm, `batch_first=True`). Tied input/output embeddings. ~930K parameters at the current 4-layer / 512-FFN config.
 
+`architecture.mmd` is a Mermaid diagram of the architecture in the abstract — symbols
+rather than the current numbers, so it stays true as the config changes and describes
+gpt_tiny just as well.
+
 `config.json` keys:
 
 | Key | Value | Notes |

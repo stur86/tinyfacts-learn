@@ -13,6 +13,32 @@
 %% nn.TransformerEncoder. Dropout is drawn because the architecture has it; the
 %% current config sets it to 0.0, since a model this small underfits anyway.
 %% Implementation: models/gpt_small/model.py
+%%
+%% Colour is by role, not decoration: blue is what goes in and comes out, green
+%% the embeddings, amber the norms, orange attention, violet the feed-forward,
+%% grey the dropouts. Fills are pale tints of their own border, so the ink stays
+%% black on white throughout.
+
+%%{init: {
+  'theme': 'base',
+  'themeVariables': {
+    'background': '#ffffff',
+    'primaryColor': '#eaf2fd',
+    'primaryTextColor': '#0b0b0b',
+    'primaryBorderColor': '#2a78d6',
+    'lineColor': '#6b6a64',
+    'textColor': '#0b0b0b',
+    'clusterBkg': '#fbfaff',
+    'clusterBorder': '#4a3aa7',
+    'edgeLabelBackground': '#ffffff'
+  },
+  'flowchart': {
+    'padding': 22,
+    'nodeSpacing': 55,
+    'rankSpacing': 60,
+    'useMaxWidth': true
+  }
+}}%%
 
 flowchart TD
     ids["Token ids<br/>B × T"]
@@ -21,7 +47,7 @@ flowchart TD
     pos_emb["Position embedding<br/>learned, table C × D"]
     add_emb(("+"))
     drop_emb["Dropout"]
-    mask["Causal mask<br/>T × T, everything above<br/>the diagonal masked out"]
+    mask["Causal mask"]
 
     ids --> tok_emb --> add_emb
     pos --> pos_emb --> add_emb
@@ -31,11 +57,11 @@ flowchart TD
         direction TB
         blk_in["Block input<br/>B × T × D"]
         ln1["LayerNorm"]
-        attn["Causal multi-head self-attention<br/>H heads, each of width D/H"]
+        attn["Causal multi-head self-attention"]
         drop_attn["Dropout"]
         add_attn(("+"))
         ln2["LayerNorm"]
-        ffn["Feed-forward<br/>Linear D → F · GELU · Dropout · Linear F → D"]
+        ffn["Feed-forward,<br/>GeLU activation"]
         drop_ffn["Dropout"]
         add_ffn(("+"))
 
@@ -45,7 +71,7 @@ flowchart TD
         add_attn -->|residual| add_ffn
     end
 
-    final_ln["LayerNorm<br/>once, after the last block"]
+    final_ln["LayerNorm"]
     head["Output head<br/>Linear D → V, no bias"]
     logits["Logits<br/>B × T × V"]
 
@@ -53,3 +79,21 @@ flowchart TD
     mask -.->|added to the attention scores| attn
     add_ffn --> final_ln --> head --> logits
     tok_emb -.->|tied weights| head
+
+    classDef io fill:#eaf2fd,stroke:#2a78d6,stroke-width:1.5px,color:#0b0b0b
+    classDef emb fill:#e2f7ef,stroke:#1baf7a,stroke-width:1.5px,color:#0b0b0b
+    classDef norm fill:#fff3d4,stroke:#c98500,stroke-width:1.5px,color:#0b0b0b
+    classDef attention fill:#fde9de,stroke:#eb6834,stroke-width:1.5px,color:#0b0b0b
+    classDef feedforward fill:#ece7fa,stroke:#4a3aa7,stroke-width:1.5px,color:#0b0b0b
+    classDef drop fill:#f4f3f0,stroke:#a5a29a,stroke-width:1.2px,color:#52514e
+    classDef sum fill:#ffffff,stroke:#6b6a64,stroke-width:1.5px,color:#0b0b0b
+    classDef masking fill:#fdecf3,stroke:#e87ba4,stroke-width:1.5px,color:#0b0b0b
+
+    class ids,pos,blk_in,logits io
+    class tok_emb,pos_emb,head emb
+    class ln1,ln2,final_ln norm
+    class attn attention
+    class ffn feedforward
+    class drop_emb,drop_attn,drop_ffn drop
+    class add_emb,add_attn,add_ffn sum
+    class mask masking

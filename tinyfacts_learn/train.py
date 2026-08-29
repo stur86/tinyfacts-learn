@@ -13,6 +13,7 @@ import torch.nn.functional as F
 from torch.optim.lr_scheduler import CosineAnnealingLR, LinearLR, SequentialLR
 
 from .dataset import TinyfactsDataset
+from .hub_data import DEFAULT_REPO_ID
 from .tokenizers import WordTokenizer
 
 MODELS_DIR = Path(__file__).parent.parent / "models"
@@ -144,41 +145,45 @@ def train(model_name: str, dry_run: bool = False, resume: Path | None = None):
     print(f"Using device: {device}")
 
     tokenizer = WordTokenizer(ignore_case=True, digits=True)
-    subfolders = config.get("subfolders", [])
-    if not subfolders:
-        print("ERROR: 'subfolders' not set in config.json", file=sys.stderr)
+    if "subfolders" in config:
+        print(
+            "ERROR: 'subfolders' is no longer used. The texts now come from the "
+            "dataset on the Hugging Face Hub, not the tinyfacts-gen submodule.\n"
+            "       Replace it with 'sources', dropping the '_created' suffix from "
+            "each name (e.g. 'manually_created' -> 'manually').",
+            file=sys.stderr,
+        )
         sys.exit(1)
 
+    sources = config.get("sources", [])
     context_size = config["context_size"]
     batch_size = config.get("batch_size", 64)
     val_fraction = config.get("val_fraction", 0.05)
     val_batches_n = config.get("val_batches", 20)
     split_seed = config.get("split_seed", 0)
 
-    print(f"Loading dataset from: {subfolders}")
+    print(f"Loading dataset from sources: {sources or 'all'}")
+    split_kwargs = dict(
+        sources=sources,
+        context_size=context_size,
+        tokenizer=tokenizer,
+        repo_id=config.get("dataset_repo"),
+        filters=config.get("dataset_filters"),
+        val_fraction=val_fraction,
+        split_seed=split_seed,
+    )
     train_ds = TinyfactsDataset(
-        subfolders=subfolders,
-        context_size=context_size,
-        tokenizer=tokenizer,
-        skip_invalid=True,
-        split="train",
-        val_fraction=val_fraction,
-        split_seed=split_seed,
+        split="train", revision=config.get("dataset_revision"), **split_kwargs
     )
-    val_ds = TinyfactsDataset(
-        subfolders=subfolders,
-        context_size=context_size,
-        tokenizer=tokenizer,
-        skip_invalid=True,
-        split="val",
-        val_fraction=val_fraction,
-        split_seed=split_seed,
-    )
+    # Pin the val half to whatever commit the train half resolved to, so a run
+    # started as the dataset changes cannot end up with mismatched halves.
+    val_ds = TinyfactsDataset(split="val", revision=train_ds.revision, **split_kwargs)
     vocab_size = train_ds.vocab_size
     train_tokens = train_ds.n_tokens
     print(f"Vocab size: {vocab_size}")
-    print(f"Train split: {train_ds.n_files:,} files | {train_tokens:,} tokens")
-    print(f"Val split:   {val_ds.n_files:,} files | {val_ds.n_tokens:,} tokens")
+    print(f"Train split: {train_ds.n_records:,} rows | {train_tokens:,} tokens")
+    print(f"Val split:   {val_ds.n_records:,} rows | {val_ds.n_tokens:,} tokens")
+    print(f"Dataset revision: {train_ds.revision}")
 
     sampler = TokenSampler(train_ds.tokens, context_size, batch_size, device)
     # Fixed seed → the same val windows every eval, every run, so the curves are comparable
@@ -275,6 +280,27 @@ def train(model_name: str, dry_run: bool = False, resume: Path | None = None):
     runs_dir = MODELS_DIR / model_name / "runs"
     runs_dir.mkdir(parents=True, exist_ok=True)
     stats_file = runs_dir / f"run_{run_timestamp}.jsonl"
+
+    # Which rows this run saw, kept beside the stats. The dataset on the Hub
+    # changes as texts are added, so the stats alone do not say what was trained
+    # on. This is a separate file because every line of the .jsonl is an eval
+    # entry, which is what `report` expects to read.
+    dataset_meta = {
+        "repo_id": config.get("dataset_repo") or DEFAULT_REPO_ID,
+        "revision": train_ds.revision,
+        "requested_revision": config.get("dataset_revision"),
+        "sources": train_ds.sources,
+        "filters": config.get("dataset_filters"),
+        "val_fraction": val_fraction,
+        "split_seed": split_seed,
+        "n_records": train_ds.n_records,
+        "n_tokens": train_ds.n_tokens,
+        "n_val_records": val_ds.n_records,
+        "n_val_tokens": val_ds.n_tokens,
+        "vocab_size": vocab_size,
+    }
+    meta_file = runs_dir / f"run_{run_timestamp}.meta.json"
+    meta_file.write_text(json.dumps(dataset_meta, indent=2) + "\n")
 
     print(f"Stats log: {stats_file}")
     print(
@@ -420,7 +446,7 @@ def train(model_name: str, dry_run: bool = False, resume: Path | None = None):
 
         if not dry_run and step % checkpoint_interval == 0:
             _save_checkpoint(model, optimizer, scheduler, config, step, checkpoint_dir,
-                             model_name, ema_state=ema_state)
+                             model_name, ema_state=ema_state, dataset_meta=dataset_meta)
 
     # Always flush remaining accumulated stats at the end
     if acc_steps > 0:
@@ -428,14 +454,14 @@ def train(model_name: str, dry_run: bool = False, resume: Path | None = None):
 
     if not dry_run:
         _save_checkpoint(model, optimizer, scheduler, config, step, checkpoint_dir,
-                         model_name, ema_state=ema_state)
+                         model_name, ema_state=ema_state, dataset_meta=dataset_meta)
         print("Training complete.")
     else:
         print("Dry run complete.")
 
 
 def _save_checkpoint(model, optimizer, scheduler, config, step, checkpoint_dir, model_name,
-                     ema_state=None):
+                     ema_state=None, dataset_meta=None):
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     filename  = checkpoint_dir / f"{model_name}_{timestamp}_step{step}.pt"
     raw_model = getattr(model, "_orig_mod", model)  # unwrap torch.compile if present
@@ -447,6 +473,7 @@ def _save_checkpoint(model, optimizer, scheduler, config, step, checkpoint_dir, 
             "optimizer_state_dict": optimizer.state_dict(),
             "scheduler_state_dict": scheduler.state_dict(),
             "config": config,
+            "dataset": dataset_meta,
         },
         filename,
     )

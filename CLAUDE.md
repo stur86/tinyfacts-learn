@@ -1,36 +1,66 @@
 The goal of this repository is to test training some small scale language models (~1M parameters) on a single user GPU using a very limited synthetic dataset and token vocabulary. The vocabulary uses xkcd's "Thing Explainer" 1000 most common words dataset, plus punctuation and special tokens.
 
+All modules live in the `tinyfacts_learn/` package.
+
 ## Tokenizer
 
-`tokenizers.py` contains `LetterTokenizer` (character-level) and `WordTokenizer` (word-level). Always use `WordTokenizer`. It has a public `vocab_size` property. Instantiate with:
+`tinyfacts_learn/tokenizers.py` contains `LetterTokenizer` (character-level) and `WordTokenizer` (word-level). Always use `WordTokenizer`. It has a public `vocab_size` property. Instantiate with:
 
 ```python
-from tokenizers import WordTokenizer
+from tinyfacts_learn.tokenizers import WordTokenizer
 tokenizer = WordTokenizer(ignore_case=True, digits=True)
 ```
 
 ## Dataset
 
-`dataset.py` exports `TinyfactsDataset(torch.utils.data.Dataset)` and `TINYFACTS_GEN_DIR`.
+The texts used to live in a `tinyfacts-gen/` submodule as `.txt` files. They now
+live in the `Stur86/tinyfacts` dataset on the Hugging Face Hub, as `.jsonl` chunks
+of one row per text. The submodule is gone.
 
-- Loads `.txt` files from named subfolders of the `tinyfacts-gen/` submodule
-- Validates each file against the Thing Explainer vocabulary using `tinyfacts.check_words`
-- `skip_invalid=False` (default) raises `ValueError` on OOV files; `skip_invalid=True` warns and skips
-- Returns sliding-window `(input_ids, target_ids)` pairs of length `context_size`
-- `vocab_size` property delegates to the tokenizer; `tokens`, `n_tokens` and `n_files` expose the loaded corpus
+`tinyfacts_learn/hub_data.py` does the fetch:
+
+- `load_records(repo_id, revision, token, record_filter) -> (list[DatasetRecord], sha)`
+- Pulls `data/tinyfacts-*.jsonl` with `snapshot_download`, reads them with upstream's
+  `DatasetStore`, sorts rows by `id` so the token stream is reproducible
+- The repo is private. Token comes from `TINYFACTS_HF_TOKEN`, `HF_TOKEN` or
+  `HUGGINGFACE_TOKEN`, in the environment or a `.env` file. `TINYFACTS_HF_REPO`
+  overrides the repository.
+- Raises `HubDataError` naming those variables when the pull is refused
+
+**Do not write a Pydantic model for the rows.** `DatasetRecord`, `DatasetStore` and
+`RecordFilter` all come from `tinyfacts.dataset` — the same classes that write the
+chunks upstream, so the schema here cannot drift from the Hub's. Import them from
+`tinyfacts.dataset`; that path pulls in no heavy dependencies.
+
+Row fields: `id` (`<source>/<name>`), `text`, `title`, `source`, `model`, `provider`,
+`instruction`, `instruction_model`, `tags`, `word_count`, `added_at`.
+
+`tinyfacts_learn/dataset.py` exports `TinyfactsDataset(torch.utils.data.Dataset)`:
+
+- Selects rows by `sources` (a list of `source` names; empty means all) and optional
+  `filters` passed to `RecordFilter.build`
+- Concatenates `record.text` and returns sliding-window `(input_ids, target_ids)` pairs
+- Properties: `vocab_size`, `revision`, `sources`, `n_records`, `n_tokens`
+- Rows are already filtered against the word list upstream, so no checking is done.
+  `validate=True` checks anyway and warns on any row it drops.
 
 **`stride`** (default 1) sets the gap between consecutive window starts. At the default,
 every token appears in up to `context_size` windows, so one "epoch" over the Dataset is
 really `context_size` passes over the corpus. Pass `stride=context_size` for
 non-overlapping windows and an epoch count that means one pass.
 
-**`split`** is `"all"` (default), `"train"` or `"val"`. Files are assigned to train or val
-by a deterministic SHA-256 hash of their path relative to `tinyfacts-gen/`, controlled by
-`val_fraction` (default 0.05) and `split_seed` (default 0). Splitting at the *file* level
-keeps both sides representative of every subfolder and guarantees no sliding window
-straddles the boundary, so val windows share no tokens with train windows.
+**`split`** is `"all"` (default), `"train"` or `"val"`. Rows are assigned to train or val
+by a deterministic SHA-256 hash of their `id`, controlled by `val_fraction` (default 0.05)
+and `split_seed` (default 0). Splitting at the *row* level keeps both sides representative
+of every source and guarantees no sliding window straddles the boundary, so val windows
+share no tokens with train windows.
 
-Known OOV files in `claude_sonnet_4_5_created/`: `how_music_works.txt` ("blow"), `the_space_story.txt` ("farm", "teach", "man's", "taught"). Use `skip_invalid=True` when loading that subfolder.
+As of dataset revision `63f932a`: 10,647 rows, 3.6M tokens, 14 sources, of which
+`tinyfacts-llama` is 10,394. Training uses every source by default.
+
+Note: `WordTokenizer.tokenize` discards whitespace, so texts concatenate with no
+document boundary token. This is known and deliberate for now — adding one would
+change `vocab_size` from 962 and invalidate existing checkpoints.
 
 ## Model convention
 
@@ -75,10 +105,13 @@ Training stats are written to `models/<name>/runs/run_<timestamp>.jsonl`, one JS
 | `max_steps` | 100000 | |
 | `eval_interval` | 1000 | steps between stat flushes / val evals |
 | `checkpoint_interval` | 10000 | steps between checkpoint saves |
-| `val_fraction` | 0.05 | fraction of *files* held out for validation |
+| `val_fraction` | 0.05 | fraction of *rows* held out for validation |
 | `val_batches` | 20 | fixed val batches evaluated at each `eval_interval` |
-| `split_seed` | 0 | seed for the deterministic file-level split |
-| `subfolders` | [...] | list of tinyfacts-gen subfolders |
+| `split_seed` | 0 | seed for the deterministic row-level split |
+| `sources` | [] | `source` names to train on; empty means every row |
+| `dataset_revision` | null | dataset commit sha to pin to; null means latest |
+| `dataset_repo` | null | override the dataset repository |
+| `dataset_filters` | null | extra `RecordFilter.build` arguments |
 
 LR schedule: linear warmup for `warmup_steps`, then cosine decay to `min_lr` over the remaining steps (`SequentialLR` with `LinearLR` + `CosineAnnealingLR`).
 
@@ -100,8 +133,8 @@ Architecture is gpt_small at half width and half depth, keeping the same 4× FFN
 
 Every *training* key is identical to gpt_small — `learning_rate`, `min_lr`,
 `warmup_steps`, `batch_size`, `max_steps`, `eval_interval`, `checkpoint_interval`,
-`dropout`, `subfolders`, and critically `split_seed`, so both models train on the same
-files and validate against the same held-out set. The pair therefore isolates model size
+`dropout`, `sources`, and critically `split_seed`, so both models train on the same
+rows and validate against the same held-out set. The pair therefore isolates model size
 as the only variable: any gap in `val_loss` between them is a capacity effect, not a
 training-budget or data-split artefact.
 
@@ -188,13 +221,14 @@ See `webapp/README.md`. Points that matter when changing things:
 
 | File | Purpose |
 |------|---------|
-| `tokenizers.py` | `WordTokenizer` with `vocab_size` property |
-| `dataset.py` | `TinyfactsDataset` — validates, tokenizes, sliding-window Dataset; `stride` + train/val split |
-| `train.py` | Core training logic (importable); `TokenSampler`, `evaluate`, resume; JSONL stats; cosine LR scheduler |
-| `generate.py` | `generate_tokens(model, tokenizer, prompt, n_tokens, temperature, top_k)` |
-| `report.py` | `generate_report(jsonl_path)` → plots folder |
-| `export_onnx.py` | `export_model()` / `export_tokenizer()` → ONNX + vocabulary for the web app |
-| `main.py` | Typer CLI hub: `train` (`--resume`), `inspect`, `report`, `generate`, `export` |
+| `tinyfacts_learn/tokenizers.py` | `WordTokenizer` with `vocab_size` property |
+| `tinyfacts_learn/hub_data.py` | Pulls the dataset chunks from the Hugging Face Hub |
+| `tinyfacts_learn/dataset.py` | `TinyfactsDataset` — selects rows, tokenizes, sliding-window Dataset; `stride` + train/val split |
+| `tinyfacts_learn/train.py` | Core training logic (importable); `TokenSampler`, `evaluate`, resume; JSONL stats; cosine LR scheduler |
+| `tinyfacts_learn/generate.py` | `generate_tokens(model, tokenizer, prompt, n_tokens, temperature, top_k)` |
+| `tinyfacts_learn/report.py` | `generate_report(jsonl_path)` → plots folder |
+| `tinyfacts_learn/export_onnx.py` | `export_model()` / `export_tokenizer()` → ONNX + vocabulary for the web app |
+| `tinyfacts_learn/main.py` | Typer CLI hub: `train` (`--resume`), `inspect`, `report`, `generate`, `export` |
 | `models/gpt_small/model.py` | GPT-small transformer + `build_model` factory |
 | `models/gpt_small/config.json` | Hyperparameters + training settings |
 | `webapp/src/tokenizer.ts` | TypeScript port of `WordTokenizer`, with character spans |
@@ -204,12 +238,24 @@ See `webapp/README.md`. Points that matter when changing things:
 
 ## Tests
 
-Run with `uv run pytest tests/ -v` (31 tests).
+Run with `uv run pytest tests/`.
+
+The dataset tests build fake `.jsonl` chunks in `tmp_path` and monkeypatch
+`hub_data.snapshot_download`, so the default run needs no network and no token.
+
+Tests marked `network` are deselected by default (`addopts = "-m 'not network'"`).
+They hit the real Hub and need a token. Run them with:
+
+```bash
+uv run pytest tests/ -m network
+```
 
 | File | Coverage |
 |------|---------|
-| `tests/test_dataset.py` | 17 tests — loading, shapes, dtypes, shift, OOV rejection, `stride`, train/val split |
-| `tests/test_model.py` | 9 tests — config, forward shape, param count, causal masking, dry-run, JSONL stats |
+| `tests/test_dataset.py` | 24 offline + 1 network — row selection, filters, shapes, shift, id ordering, revision, validation, `stride`, train/val split, error messages |
+| `tests/test_model.py` | 9 tests — config, forward shape, param count, causal masking, dry-run (network), JSONL stats (network) |
+| `tests/test_trm.py` | TRM model and training dry runs (2 network) |
+| `tests/test_model_source.py` | `model.source` indirection |
 | `tests/test_generate.py` | 5 tests — output type, token count, greedy determinism, empty-prompt error, top-k |
 | `tests/test_report.py` | 5 tests — output dir, individual PNGs, overview, naming, empty-file error |
 | `tests/test_export_onnx.py` | ONNX export — file layout, sidecar, graph signature, parity with PyTorch |
@@ -222,5 +268,5 @@ Web app tests: `cd webapp && npm test` (vitest — tokenizer parity with Python,
 1. Create `models/<name>/` with `config.json` and either:
 	- `model.py` (must export `build_model(config, vocab_size)`), or
 	- `model.source` containing another model folder name to reuse its `model.py`
-2. Add the model name to the `subfolders` list in its config if needed
+2. Set `sources` in its config to narrow the training data, or leave it empty for every row
 3. Train: `uv run python main.py train <name>`

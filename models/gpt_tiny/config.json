@@ -6,7 +6,7 @@
   "ffn_dim": 256,
   "dropout": 0.0,
   "learning_rate": 0.001,
-  "min_lr": 1e-5,
+  "min_lr": 1e-05,
   "warmup_steps": 1000,
   "batch_size": 256,
   "max_steps": 100000,
@@ -15,14 +15,6 @@
   "val_fraction": 0.05,
   "val_batches": 20,
   "split_seed": 0,
-  "subfolders": [
-    "claude_code_created",
-    "claude_sonnet_4_5_created",
-    "gpt-oss_120b-cloud_created",
-    "gpt-5_1_created",
-    "manually_created",
-    "questions_gemini-3-flash-preview_cloud_created",
-    "gemini-3-flash-preview_cloud_created",
-    "tinyfacts-llama_created"
-  ]
+  "sources": [],
+  "dataset_revision": null
 }

@@ -6,7 +6,7 @@
   "ffn_dim": 256,
   "dropout": 0.1,
   "learning_rate": 0.00025,
-  "min_lr": 1e-5,
+  "min_lr": 1e-05,
   "warmup_steps": 200,
   "batch_size": 32,
   "max_steps": 50000,
@@ -16,11 +16,6 @@
   "n_recursions": 6,
   "T": 3,
   "ema_decay": 0.999,
-  "subfolders": [
-    "claude_sonnet_4_5_created",
-    "gpt-5_1_created",
-    "manually_created",
-    "questions_gemini-3-flash-preview_cloud_created",
-    "gemini-3-flash-preview_cloud_created"
-  ]
+  "sources": [],
+  "dataset_revision": null
 }

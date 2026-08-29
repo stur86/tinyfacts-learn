@@ -6,12 +6,6 @@ resolution-markers = [
     "python_full_version < '3.13'",
 ]
 
-[manifest]
-members = [
-    "tinyfacts-gen",
-    "tinyfacts-learn",
-]
-
 [[package]]
 name = "ag-ui-protocol"
 version = "0.1.13"
@@ -3776,8 +3770,9 @@ wheels = [
 [[package]]
 name = "tinyfacts-gen"
 version = "0.1.0"
-source = { editable = "tinyfacts-gen" }
+source = { git = "https://github.com/stur86/tinyfacts-gen?rev=c00b48664db8c2ae25b5bc5559da2ba3b3921515#c00b48664db8c2ae25b5bc5559da2ba3b3921515" }
 dependencies = [
+    { name = "huggingface-hub" },
     { name = "jsonlines" },
     { name = "lemminflect" },
     { name = "nltk" },
@@ -3789,30 +3784,19 @@ dependencies = [
     { name = "typer" },
 ]
 
-[package.metadata]
-requires-dist = [
-    { name = "jsonlines", specifier = ">=4.0.0" },
-    { name = "lemminflect", specifier = ">=0.2.3" },
-    { name = "nltk", specifier = ">=3.9.2" },
-    { name = "openai", specifier = ">=1.99.6" },
-    { name = "pydantic-ai", specifier = "==1.25.1" },
-    { name = "python-dotenv", specifier = ">=1.1.1" },
-    { name = "pyyaml", specifier = ">=6.0" },
-    { name = "textual", specifier = ">=6.7.0" },
-    { name = "typer", specifier = ">=0.20.0" },
-]
-
 [[package]]
 name = "tinyfacts-learn"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
+    { name = "huggingface-hub" },
     { name = "marimo" },
     { name = "matplotlib" },
     { name = "miniml-jax" },
     { name = "numpy" },
     { name = "onnx" },
     { name = "onnxscript" },
+    { name = "python-dotenv" },
     { name = "scipy" },
     { name = "tinyfacts-gen" },
     { name = "torch" },
@@ -3827,14 +3811,16 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "huggingface-hub", specifier = ">=0.36.0" },
     { name = "marimo", specifier = ">=0.18.4" },
     { name = "matplotlib", specifier = ">=3.10.8" },
     { name = "miniml-jax", specifier = ">=0.6.0" },
     { name = "numpy", specifier = ">=2.3.0" },
     { name = "onnx", specifier = ">=1.19.0" },
     { name = "onnxscript", specifier = ">=0.5.0" },
+    { name = "python-dotenv", specifier = ">=1.1.1" },
     { name = "scipy", specifier = ">=1.16.3" },
-    { name = "tinyfacts-gen", editable = "tinyfacts-gen" },
+    { name = "tinyfacts-gen", git = "https://github.com/stur86/tinyfacts-gen?rev=c00b48664db8c2ae25b5bc5559da2ba3b3921515" },
     { name = "torch", specifier = ">=2.10.0", index = "https://download.pytorch.org/whl/cu126" },
     { name = "typer", specifier = ">=0.21.1" },
 ]

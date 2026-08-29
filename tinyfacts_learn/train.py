@@ -14,6 +14,7 @@ from torch.optim.lr_scheduler import CosineAnnealingLR, LinearLR, SequentialLR
 from torch.utils.data import DataLoader
 
 from .dataset import TinyfactsDataset
+from .hub_data import DEFAULT_REPO_ID
 from .tokenizers import WordTokenizer
 
 MODELS_DIR = Path(__file__).parent.parent / "models"
@@ -82,21 +83,33 @@ def train(model_name: str, dry_run: bool = False):
     print(f"Using device: {device}")
 
     tokenizer = WordTokenizer(ignore_case=True, digits=True)
-    subfolders = config.get("subfolders", [])
-    if not subfolders:
-        print("ERROR: 'subfolders' not set in config.json", file=sys.stderr)
+    if "subfolders" in config:
+        print(
+            "ERROR: 'subfolders' is no longer used. The texts now come from the "
+            "dataset on the Hugging Face Hub, not the tinyfacts-gen submodule.\n"
+            "       Replace it with 'sources', dropping the '_created' suffix from "
+            "each name (e.g. 'manually_created' -> 'manually').",
+            file=sys.stderr,
+        )
         sys.exit(1)
 
-    print(f"Loading dataset from: {subfolders}")
+    sources = config.get("sources", [])
+    print(f"Loading dataset from sources: {sources or 'all'}")
     dataset = TinyfactsDataset(
-        subfolders=subfolders,
+        sources=sources,
         context_size=config["context_size"],
         tokenizer=tokenizer,
-        skip_invalid=True,
+        repo_id=config.get("dataset_repo"),
+        revision=config.get("dataset_revision"),
+        filters=config.get("dataset_filters"),
     )
     vocab_size = dataset.vocab_size
     batch_size = config.get("batch_size", 64)
-    print(f"Vocab size: {vocab_size} | Dataset size: {len(dataset)} windows")
+    print(
+        f"Vocab size: {vocab_size} | {dataset.n_records:,} rows | "
+        f"{dataset.n_tokens:,} tokens | {len(dataset):,} windows"
+    )
+    print(f"Dataset revision: {dataset.revision}")
 
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True, drop_last=True)
     steps_per_epoch = len(dataloader)
@@ -143,6 +156,23 @@ def train(model_name: str, dry_run: bool = False):
     runs_dir = MODELS_DIR / model_name / "runs"
     runs_dir.mkdir(parents=True, exist_ok=True)
     stats_file = runs_dir / f"run_{run_timestamp}.jsonl"
+
+    # Which rows this run saw, kept beside the stats. The dataset on the Hub
+    # changes as texts are added, so the stats alone do not say what was trained
+    # on. This is a separate file because every line of the .jsonl is an eval
+    # entry, which is what `report` expects to read.
+    dataset_meta = {
+        "repo_id": config.get("dataset_repo") or DEFAULT_REPO_ID,
+        "revision": dataset.revision,
+        "requested_revision": config.get("dataset_revision"),
+        "sources": dataset.sources,
+        "filters": config.get("dataset_filters"),
+        "n_records": dataset.n_records,
+        "n_tokens": dataset.n_tokens,
+        "vocab_size": vocab_size,
+    }
+    meta_file = runs_dir / f"run_{run_timestamp}.meta.json"
+    meta_file.write_text(json.dumps(dataset_meta, indent=2) + "\n")
 
     print(f"Stats log: {stats_file}")
     print(f"Training for {max_steps} steps{'  [DRY RUN]' if dry_run else ''}...")
@@ -284,7 +314,7 @@ def train(model_name: str, dry_run: bool = False):
 
         if not dry_run and step % checkpoint_interval == 0:
             _save_checkpoint(model, optimizer, config, step, checkpoint_dir, model_name,
-                             ema_state=ema_state)
+                             ema_state=ema_state, dataset_meta=dataset_meta)
 
     # Always flush remaining accumulated stats at the end
     if acc_steps > 0:
@@ -292,14 +322,14 @@ def train(model_name: str, dry_run: bool = False):
 
     if not dry_run:
         _save_checkpoint(model, optimizer, config, step, checkpoint_dir, model_name,
-                         ema_state=ema_state)
+                         ema_state=ema_state, dataset_meta=dataset_meta)
         print("Training complete.")
     else:
         print("Dry run complete.")
 
 
 def _save_checkpoint(model, optimizer, config, step, checkpoint_dir, model_name,
-                     ema_state=None):
+                     ema_state=None, dataset_meta=None):
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     filename  = checkpoint_dir / f"{model_name}_{timestamp}_step{step}.pt"
     state_dict = ema_state if ema_state is not None else model.state_dict()
@@ -309,6 +339,7 @@ def _save_checkpoint(model, optimizer, config, step, checkpoint_dir, model_name,
             "model_state_dict": state_dict,
             "optimizer_state_dict": optimizer.state_dict(),
             "config": config,
+            "dataset": dataset_meta,
         },
         filename,
     )

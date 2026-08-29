@@ -1,6 +1,6 @@
 # tinyfacts-learn
 
-Train and run small language models (~1M parameters) on a restricted vocabulary derived from xkcd's [Thing Explainer](https://xkcd.com/thing-explainer/) word list. All text data lives in the `tinyfacts-gen/` submodule.
+Train and run small language models (~1M parameters) on a restricted vocabulary derived from xkcd's [Thing Explainer](https://xkcd.com/thing-explainer/) word list. The text data lives in the [`Stur86/tinyfacts`](https://huggingface.co/datasets/Stur86/tinyfacts) dataset on the Hugging Face Hub.
 
 ## Setup
 
@@ -9,6 +9,23 @@ uv sync
 ```
 
 This installs all dependencies including PyTorch (CUDA 12.6 build). For CPU-only or a different CUDA version, edit `pyproject.toml` accordingly before syncing.
+
+The word list itself comes from the `tinyfacts` package, pinned to a commit of
+[tinyfacts-gen](https://github.com/stur86/tinyfacts-gen) in `[tool.uv.sources]`.
+
+### Dataset access
+
+The texts are pulled from the Hub the first time you train, and cached after that.
+The dataset repository is private, so a token with read rights is needed. Put it in
+a `.env` file at the repository root, or in the environment:
+
+```bash
+HF_TOKEN=hf_...
+```
+
+`TINYFACTS_HF_TOKEN` and `HUGGINGFACE_TOKEN` work too — the same names the
+`tinyfacts` CLI uses, so one token serves both. Set `TINYFACTS_HF_REPO` to read
+the rows from a different dataset repository.
 
 ## Available models
 
@@ -89,6 +106,24 @@ Plots are written to a folder named after the run file, alongside it.
 ```bash
 uv run pytest tests/ -v
 ```
+
+## Choosing the training data
+
+`config.json` says which rows a model trains on:
+
+| Key | Meaning |
+|-----|---------|
+| `sources` | Which runs to use, by `source` name. Empty (or absent) uses every row. |
+| `dataset_revision` | A dataset commit sha to pin the run to. `null` uses the latest. |
+| `dataset_repo` | A different dataset repository. `null` uses `Stur86/tinyfacts`. |
+| `dataset_filters` | Extra row filters: `min_words`, `max_words`, `model`, `tag`, `has_instruction`, and `id`/`title`/`text`/`instruction` regular expressions. |
+
+Every training run writes `models/<name>/runs/run_<timestamp>.meta.json` beside its
+stats, naming the dataset revision, sources and row count it actually saw. The same
+record goes into each checkpoint under the `dataset` key. The dataset on the Hub grows
+as texts are added, so this is what says which version of it a run was trained on.
+
+To repeat an earlier run exactly, copy its `revision` into `dataset_revision`.
 
 ## Adding a new model
 

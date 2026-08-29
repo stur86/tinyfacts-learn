@@ -1,5 +1,6 @@
 # tests/test_model.py
 import json
+import pytest
 import torch
 import importlib.util
 from pathlib import Path
@@ -82,6 +83,7 @@ def test_causal_masking():
         "Causal mask violated: position 0 logits changed when future tokens were perturbed"
 
 
+@pytest.mark.network
 def test_train_dry_run():
     """Training via main.py hub must complete a dry run without error."""
     import subprocess, sys
@@ -94,6 +96,7 @@ def test_train_dry_run():
     assert result.returncode == 0, f"Dry run failed:\nSTDOUT:\n{result.stdout}\nSTDERR:\n{result.stderr}"
 
 
+@pytest.mark.network
 def test_train_dry_run_writes_stats():
     """Dry run must write at least one line to the JSONL stats file."""
     import subprocess, sys, json

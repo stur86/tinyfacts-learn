@@ -22,3 +22,7 @@ papers/*
 # Web app
 webapp/node_modules
 webapp/dist
+
+# Web app model exports
+webapp/public/models/*.onnx
+webapp/public/models/*.json

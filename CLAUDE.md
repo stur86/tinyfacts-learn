@@ -169,7 +169,30 @@ Shows config, total/trainable parameters, per-component breakdown (tied-weight a
 ```bash
 uv run python main.py report models/gpt_small/runs/run_<timestamp>.jsonl
 ```
-Reads a training run JSONL file and writes a report folder alongside it (named after the run stem) containing: `loss.png`, `perplexity.png`, `accuracy.png`, `lr.png`, and `overview.png` (2×2 grid). Loss, perplexity and accuracy overlay the validation curve as a dashed line when the run recorded one. Each plot has a secondary epoch axis with ticks at round intervals. Core logic is in `report.py` → `generate_report(jsonl_path)`.
+Reads a training run JSONL file and writes a report folder alongside it (named after
+the run stem). Plots are seaborn, on a light surface with a recessive grid. Core logic
+is in `report.py` → `generate_report(jsonl_path)`.
+
+| File | Contents |
+|------|----------|
+| `loss.png`, `perplexity.png`, `accuracy.png` | train and val on shared axes |
+| `lr.png` | the LR schedule, log y |
+| `gap.png` | `val_loss - loss` against a zero line — only when the run logged val |
+| `throughput.png` | tokens/second between flushes, from `tokens_seen` and `elapsed_s` |
+| `overview.png` | 2×2 grid of loss, perplexity, accuracy and LR |
+
+**Colour names the split, not the metric**: train is `#2a78d6` and val `#eb6834` in
+every panel, and single-series panels (`lr`, `gap`, `throughput`) take a third hue,
+`#4a3aa7`, that neither split owns. The three were checked for colour-blind separation
+and contrast against the surface — don't swap them for matplotlib's default cycle,
+which encodes the panel rather than the series.
+
+Each panel ends its lines with the final value, staggered apart when train and val
+converge, and carries a secondary epoch axis with ticks at round intervals (the same
+axis in another unit — never a second y-scale). Panels the run has no data for are
+skipped rather than written empty, so an older run without val metrics gets no
+`gap.png`. When a `run_<timestamp>.meta.json` sidecar sits beside the JSONL, the
+overview's subtitle names the dataset repo, revision and row counts it records.
 
 ### generate
 ```bash
@@ -226,7 +249,7 @@ See `webapp/README.md`. Points that matter when changing things:
 | `tinyfacts_learn/dataset.py` | `TinyfactsDataset` — selects rows, tokenizes, sliding-window Dataset; `stride` + train/val split |
 | `tinyfacts_learn/train.py` | Core training logic (importable); `TokenSampler`, `evaluate`, resume; JSONL stats; cosine LR scheduler |
 | `tinyfacts_learn/generate.py` | `generate_tokens(model, tokenizer, prompt, n_tokens, temperature, top_k)` |
-| `tinyfacts_learn/report.py` | `generate_report(jsonl_path)` → plots folder |
+| `tinyfacts_learn/report.py` | `generate_report(jsonl_path)` → seaborn plots folder |
 | `tinyfacts_learn/export_onnx.py` | `export_model()` / `export_tokenizer()` → ONNX + vocabulary for the web app |
 | `tinyfacts_learn/main.py` | Typer CLI hub: `train` (`--resume`), `inspect`, `report`, `generate`, `export` |
 | `models/gpt_small/model.py` | GPT-small transformer + `build_model` factory |
@@ -257,7 +280,7 @@ uv run pytest tests/ -m network
 | `tests/test_trm.py` | TRM model and training dry runs (2 network) |
 | `tests/test_model_source.py` | `model.source` indirection |
 | `tests/test_generate.py` | 5 tests — output type, token count, greedy determinism, empty-prompt error, top-k |
-| `tests/test_report.py` | 5 tests — output dir, individual PNGs, overview, naming, empty-file error |
+| `tests/test_report.py` | 10 tests — output dir, individual PNGs, overview, naming, gap/throughput panels, skipped metrics, empty-file error |
 | `tests/test_export_onnx.py` | ONNX export — file layout, sidecar, graph signature, parity with PyTorch |
 | `tests/test_webapp_fixtures.py` | Web app tokenizer fixtures are current and self-consistent |
 

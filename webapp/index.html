@@ -18,8 +18,18 @@
       <header class="app-header">
         <h1>tinyfacts playground</h1>
         <p class="subtitle">
-          Million-parameter language models, trained on a 1000-word vocabulary, running entirely in
-          your browser. Nothing is sent anywhere.
+            The <tt>tinyfacts</tt> models are a series of models trained on <a href="https://huggingface.co/datasets/Stur86/tinyfacts">the tinyfacts dataset</a>,
+            a synthetic dataset built only using allowed forms of the 1000 most common English words originally used by Randall Munroe in the xkcd coming <a
+             href="https://xkcd.com/1133/">Up Goer Five</a>, and inspired by the <a href="https://huggingface.co/datasets/roneneldan/TinyStories">
+                 tinystories dataset and model series</a>. These models use a very restricted vocabulary to achieve speaking coherent, if simple, English
+             with less than 1M parameters and very few training tokens. They are raw completion models, not finetuned for instruction following.
+             You can experiment with them here, entirely in your browser, as inference is handled by <a href="https://onnxruntime.ai/docs/tutorials/web/">onnxruntime-web</a>.
+
+             Blog posts:
+             <ul>
+                 <li><a href="https://stur86.github.io/s-plus-plus/posts/the-big-learning-set-for-big-world-helpers/">The Big Learning Set for Big World Helpers</a></li>
+             </ul>
+
         </p>
       </header>
 

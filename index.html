@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ctext y='26' font-size='26'%3E%F0%9F%A4%96%3C/text%3E%3C/svg%3E"
+    />
+    <title>tinyfacts playground</title>
+    <meta
+      name="description"
+      content="Run tinyfacts-learn language models entirely in your browser with ONNX Runtime Web."
+    />
+    <script type="module" crossorigin src="./assets/index-DjXjj5br.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-BbowyOZ2.css">
+  </head>
+  <body>
+    <main class="app">
+      <header class="app-header">
+        <h1>tinyfacts playground</h1>
+        <p class="subtitle">
+            The <tt>tinyfacts</tt> models are a series of models trained on <a href="https://huggingface.co/datasets/Stur86/tinyfacts">the tinyfacts dataset</a>,
+            a synthetic dataset built only using allowed forms of the 1000 most common English words originally used by Randall Munroe in the xkcd coming <a
+             href="https://xkcd.com/1133/">Up Goer Five</a>, and inspired by the <a href="https://huggingface.co/datasets/roneneldan/TinyStories">
+                 tinystories dataset and model series</a>. These models use a very restricted vocabulary to achieve speaking coherent, if simple, English
+             with less than 1M parameters and very few training tokens. They are raw completion models, not finetuned for instruction following.
+             You can experiment with them here, entirely in your browser, as inference is handled by <a href="https://onnxruntime.ai/docs/tutorials/web/">onnxruntime-web</a>.
+
+             Blog posts:
+             <ul>
+                 <li><a href="https://stur86.github.io/s-plus-plus/posts/the-big-learning-set-for-big-world-helpers/">The Big Learning Set for Big World Helpers</a></li>
+             </ul>
+
+        </p>
+      </header>
+
+      <section class="panel">
+        <div class="controls">
+          <label class="control control-wide">
+            <span>Model</span>
+            <select id="model-select" disabled>
+              <option>Loading…</option>
+            </select>
+          </label>
+
+          <label class="control">
+            <span>Tokens</span>
+            <input id="tokens" type="number" min="1" max="512" step="1" value="60" />
+          </label>
+
+          <label class="control">
+            <span>Temperature</span>
+            <input id="temperature" type="number" min="0" max="2" step="0.05" value="0.5" />
+          </label>
+
+          <label class="control">
+            <span>Top-k</span>
+            <input id="top-k" type="number" min="0" max="200" step="1" value="10" />
+          </label>
+        </div>
+        <p class="model-details" id="model-details"></p>
+      </section>
+
+      <section class="panel">
+        <label class="field-label" for="prompt">Start a sentence</label>
+        <div class="editor" id="editor">
+          <div class="editor-highlights" id="highlights" aria-hidden="true"></div>
+          <textarea
+            id="prompt"
+            rows="4"
+            spellcheck="false"
+            autocomplete="off"
+            placeholder="the sun is a big ball of hot air that gives us light"
+          ></textarea>
+        </div>
+        <p class="vocab-note" id="vocab-note"></p>
+
+        <div class="actions">
+          <button id="complete" type="button" class="primary" disabled>Complete</button>
+          <button id="stop" type="button" hidden>Stop</button>
+          <span class="status" id="status"></span>
+        </div>
+      </section>
+
+      <section class="panel output-panel">
+        <div class="output-header">
+          <h2>Completion</h2>
+          <button id="copy" type="button" class="copy" disabled>Copy</button>
+        </div>
+        <p class="output" id="output"><span class="placeholder">Nothing generated yet.</span></p>
+      </section>
+
+      <footer class="app-footer">
+        <p>
+          Inference runs on ONNX Runtime Web (WebAssembly). Words the tokenizer does not know are
+          <mark class="unk">highlighted</mark> — the model sees them all as the same
+          <code>&lt;UNK&gt;</code> token.
+        </p>
+      </footer>
+    </main>
+
+  </body>
+</html>

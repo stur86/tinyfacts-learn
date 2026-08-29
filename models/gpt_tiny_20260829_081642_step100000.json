@@ -1,0 +1,32 @@
+{
+  "id": "gpt_tiny_20260829_081642_step100000",
+  "model": "gpt_tiny",
+  "file": "gpt_tiny_20260829_081642_step100000.onnx",
+  "checkpoint": "gpt_tiny_20260829_081642_step100000.pt",
+  "step": 100000,
+  "contextSize": 128,
+  "vocabSize": 962,
+  "params": 169856,
+  "sizeBytes": 973496,
+  "exportedAt": "2026-08-29T07:41:18+00:00",
+  "config": {
+    "context_size": 128,
+    "n_embd": 64,
+    "n_heads": 4,
+    "n_layers": 2,
+    "ffn_dim": 256,
+    "dropout": 0.0,
+    "learning_rate": 0.001,
+    "min_lr": 1e-05,
+    "warmup_steps": 1000,
+    "batch_size": 256,
+    "max_steps": 100000,
+    "eval_interval": 1000,
+    "checkpoint_interval": 10000,
+    "val_fraction": 0.05,
+    "val_batches": 20,
+    "split_seed": 0,
+    "sources": [],
+    "dataset_revision": null
+  }
+}

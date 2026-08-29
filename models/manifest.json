@@ -1,0 +1,29 @@
+{
+  "generatedAt": "2026-08-29T10:38:34.187Z",
+  "models": [
+    {
+      "id": "gpt_small_20260823_201835_step30000",
+      "model": "gpt_small",
+      "file": "gpt_small_20260823_201835_step30000.onnx",
+      "contextSize": 128,
+      "sizeBytes": 4314897,
+      "step": 30000,
+      "params": 932864,
+      "vocabSize": 962,
+      "exportedAt": "2026-08-25T06:46:51+00:00",
+      "hasMetadata": true
+    },
+    {
+      "id": "gpt_tiny_20260829_081642_step100000",
+      "model": "gpt_tiny",
+      "file": "gpt_tiny_20260829_081642_step100000.onnx",
+      "contextSize": 128,
+      "sizeBytes": 973496,
+      "step": 100000,
+      "params": 169856,
+      "vocabSize": 962,
+      "exportedAt": "2026-08-29T07:41:18+00:00",
+      "hasMetadata": true
+    }
+  ]
+}

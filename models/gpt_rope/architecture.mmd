@@ -1,0 +1,116 @@
+%% GPT-RoPE — the shape of the architecture, not any one instance of it.
+%%
+%% This is models/gpt_small/architecture.mmd with the position embedding taken
+%% out and rotation put inside attention. Read the two side by side: everything
+%% outside the attention subgraph is unchanged, which is the point of the model.
+%%
+%% Symbols. Everything but B and T is a key in this folder's config.json.
+%%
+%%   B  batch size                     T  tokens in the sequence, T <= C
+%%   V  vocab_size (the tokenizer's)   C  context_size
+%%   D  n_embd                         H  n_heads
+%%   F  ffn_dim                        L  n_layers
+%%   Dh d_head = D / H, always even    theta  rope_theta
+%%
+%% The blocks are hand-written (models/gpt_rope/model.py) rather than
+%% nn.TransformerEncoderLayer, because RoPE needs Q and K between projection and
+%% attention. Dropout is drawn because the architecture has it; the current
+%% config sets it to 0.0, since a model this small underfits anyway.
+%%
+%% Colour is by role, not decoration: blue is what goes in and comes out, green
+%% the embeddings, amber the norms, orange attention, violet the feed-forward,
+%% grey the dropouts, pink the masking and the positional rotation. Fills are
+%% pale tints of their own border, so the ink stays black on white throughout.
+
+%%{init: {
+  'theme': 'base',
+  'themeVariables': {
+    'background': '#ffffff',
+    'primaryColor': '#eaf2fd',
+    'primaryTextColor': '#0b0b0b',
+    'primaryBorderColor': '#2a78d6',
+    'lineColor': '#6b6a64',
+    'textColor': '#0b0b0b',
+    'clusterBkg': '#fbfaff',
+    'clusterBorder': '#4a3aa7',
+    'edgeLabelBackground': '#ffffff'
+  },
+  'flowchart': {
+    'padding': 22,
+    'nodeSpacing': 55,
+    'rankSpacing': 60,
+    'useMaxWidth': true
+  }
+}}%%
+
+flowchart TD
+    ids["Token ids<br/>B × T"]
+    tok_emb["Token embedding<br/>lookup table V × D"]
+    drop_emb["Dropout"]
+    tables["Rotation tables<br/>cos, sin — T × Dh<br/>fixed, from theta"]
+    mask["Causal mask"]
+
+    ids --> tok_emb --> drop_emb
+
+    subgraph block["Transformer block — repeated L times, pre-norm"]
+        direction TB
+        blk_in["Block input<br/>B × T × D"]
+        ln1["LayerNorm"]
+
+        subgraph attn["Causal multi-head self-attention"]
+            direction TB
+            qkv["QKV projection<br/>Linear D → 3D, split into H heads"]
+            rope_q["Rotate Q by position"]
+            rope_k["Rotate K by position"]
+            v_path["V — carried through unrotated"]
+            sdpa["Scaled dot-product attention<br/>softmax(QKᵀ / √Dh) · V"]
+            out_proj["Output projection<br/>Linear D → D"]
+
+            qkv -->|Q| rope_q --> sdpa
+            qkv -->|K| rope_k --> sdpa
+            qkv -->|V| v_path --> sdpa
+            sdpa --> out_proj
+        end
+
+        drop_attn["Dropout"]
+        add_attn(("+"))
+        ln2["LayerNorm"]
+        ffn["Feed-forward,<br/>GeLU activation"]
+        drop_ffn["Dropout"]
+        add_ffn(("+"))
+
+        blk_in --> ln1 --> qkv
+        out_proj --> drop_attn --> add_attn
+        blk_in -->|residual| add_attn
+        add_attn --> ln2 --> ffn --> drop_ffn --> add_ffn
+        add_attn -->|residual| add_ffn
+    end
+
+    final_ln["LayerNorm"]
+    head["Output head<br/>Linear D → V, no bias"]
+    logits["Logits<br/>B × T × V"]
+
+    drop_emb --> blk_in
+    tables -.->|same tables in every layer| rope_q
+    tables -.-> rope_k
+    mask -.->|added to the attention scores| sdpa
+    add_ffn --> final_ln --> head --> logits
+    tok_emb -.->|tied weights| head
+
+    classDef io fill:#eaf2fd,stroke:#2a78d6,stroke-width:1.5px,color:#0b0b0b
+    classDef emb fill:#e2f7ef,stroke:#1baf7a,stroke-width:1.5px,color:#0b0b0b
+    classDef norm fill:#fff3d4,stroke:#c98500,stroke-width:1.5px,color:#0b0b0b
+    classDef attention fill:#fde9de,stroke:#eb6834,stroke-width:1.5px,color:#0b0b0b
+    classDef feedforward fill:#ece7fa,stroke:#4a3aa7,stroke-width:1.5px,color:#0b0b0b
+    classDef drop fill:#f4f3f0,stroke:#a5a29a,stroke-width:1.2px,color:#52514e
+    classDef sum fill:#ffffff,stroke:#6b6a64,stroke-width:1.5px,color:#0b0b0b
+    classDef masking fill:#fdecf3,stroke:#e87ba4,stroke-width:1.5px,color:#0b0b0b
+
+    class ids,blk_in,logits io
+    class tok_emb,head emb
+    class ln1,ln2,final_ln norm
+    class qkv,sdpa,out_proj,v_path attention
+    class ffn feedforward
+    class drop_emb,drop_attn,drop_ffn drop
+    class add_attn,add_ffn sum
+    class mask,tables,rope_q,rope_k masking

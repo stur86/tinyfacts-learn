@@ -33,6 +33,7 @@ the rows from a different dataset repository.
 |-------|-------------|
 | `gpt_small` | GPT-style transformer, ~930K parameters (n_embd=128, 2 layers) |
 | `gpt_tiny` | Same architecture as gpt_small, much smaller (n_embd=32, 1 layer) |
+| `gpt_rope` | gpt_small with rotary position embeddings (RoPE) in place of the learned position table, ~916K parameters |
 | `trm` | Tiny Recursive Model — iterative latent reasoning with a learned halt signal |
 | `mamba` | Selective state-space model (S6), ~841K parameters (d_model=128, 6 layers) |
 

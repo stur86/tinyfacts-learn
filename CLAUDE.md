@@ -142,6 +142,35 @@ rows and validate against the same held-out set. The pair therefore isolates mod
 as the only variable: any gap in `val_loss` between them is a capacity effect, not a
 training-budget or data-split artefact.
 
+## gpt_rope model
+
+`models/gpt_rope/` — gpt_small with **rotary position embeddings** (RoPE, arXiv:2104.09864)
+instead of the learned `pos_emb` table. Position is applied by rotating queries and keys
+inside every attention head, so attention scores depend on the *offset* between two tokens
+rather than on their absolute indices, and no parameter encodes position at all.
+916,480 parameters — gpt_small minus the `context_size × n_embd` position table.
+
+`nn.TransformerEncoderLayer` never exposes Q and K between projection and attention, so
+`model.py` writes the block out by hand. It is a deliberate transcription of the built-in
+layer — same pre-norm order, GeLU, dropout placement and initialisation (xavier on the
+fused QKV weight, zeroed attention biases, default `nn.Linear` init elsewhere) — so the
+positional scheme is the only difference against gpt_small. Attention is
+`F.scaled_dot_product_attention(..., is_causal=True)`.
+
+The cos/sin tables are **non-persistent** buffers: a pure function of the config, so they
+move with `.to(device)` but stay out of the state dict and checkpoints carry weights only.
+Rotation is done in float32 and cast back, so the angles stay exact under mixed precision.
+
+Config is gpt_small's, key for key, plus **`rope_theta`** (10000.0 — the base of the
+frequency series; larger stretches the wavelengths, the usual knob for longer context).
+`rope_theta` is in `_ARCH_KEYS`, so a resume across a change to it is refused.
+`tests/test_gpt_rope.py` asserts the config match, which keeps the pair an ablation:
+a `val_loss` gap against gpt_small is the positional scheme and nothing else.
+
+`architecture.mmd` is the gpt_small diagram with the position embedding removed and the
+rotation drawn inside attention — the two are meant to be read side by side.
+`architectures/GPT_ROPE.md` is the write-up.
+
 ## CLI — main.py
 
 `main.py` is the Typer hub for all tools. Run with `uv run python main.py <command>`.
@@ -258,6 +287,7 @@ See `webapp/README.md`. Points that matter when changing things:
 | `tinyfacts_learn/main.py` | Typer CLI hub: `train` (`--resume`), `inspect`, `report`, `generate`, `export` |
 | `models/gpt_small/model.py` | GPT-small transformer + `build_model` factory |
 | `models/gpt_small/config.json` | Hyperparameters + training settings |
+| `models/gpt_rope/model.py` | GPT with rotary position embeddings + `build_model` factory |
 | `webapp/src/tokenizer.ts` | TypeScript port of `WordTokenizer`, with character spans |
 | `webapp/src/inference.ts` | ONNX Runtime Web session, sampling, generation loop |
 | `webapp/plugins/models-manifest.ts` | Vite plugin: scans `public/models` → `manifest.json` |
@@ -281,6 +311,7 @@ uv run pytest tests/ -m network
 |------|---------|
 | `tests/test_dataset.py` | 24 offline + 1 network — row selection, filters, shapes, shift, id ordering, revision, validation, `stride`, train/val split, error messages |
 | `tests/test_model.py` | 9 tests — config, forward shape, param count, causal masking, dry-run (network), JSONL stats (network) |
+| `tests/test_gpt_rope.py` | 15 tests — shapes, short/overlong sequences, causal masking, RoPE norm preservation and offset-only scores, no position table, buffers out of the state dict, config parity with gpt_small |
 | `tests/test_trm.py` | TRM model and training dry runs (2 network) |
 | `tests/test_model_source.py` | `model.source` indirection |
 | `tests/test_generate.py` | 5 tests — output type, token count, greedy determinism, empty-prompt error, top-k |

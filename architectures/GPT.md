@@ -2,6 +2,8 @@
 
 Used by: `gpt_small`, `gpt_tiny`
 
+A variant that swaps the learned position table for rotary position embeddings is documented separately in [GPT_ROPE.md](GPT_ROPE.md); everything below still applies to it.
+
 ## Overview
 
 A decoder-only transformer trained autoregressively: at every position the model predicts the next token using only the tokens that came before it. The architecture here follows GPT-2 style with pre-normalization.

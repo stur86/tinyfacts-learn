@@ -22,6 +22,7 @@ MODELS_DIR = Path(__file__).parent.parent / "models"
 # for a resume to be meaningful.
 _ARCH_KEYS = (
     "context_size", "n_embd", "n_heads", "n_layers", "ffn_dim",
+    "rope_theta",
     "d_model", "d_state", "d_conv", "expand",
     "n_supervision", "n_recursions", "T",
 )
